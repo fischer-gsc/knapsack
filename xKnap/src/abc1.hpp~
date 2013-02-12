@@ -1,0 +1,555 @@
+#include <cstdlib>
+#include <sstream>
+#include <string>
+#include <stdio.h>
+#include <stdlib.h>
+#include <iostream>
+#include <cmath>
+#include <limits>
+#include <ctime>
+#include <vector>
+#include "ngraph/ngraph.hpp"
+#include "scip/pub_var.h"          // SCIPvarGetObj
+//#include "scip_misc.h"      // SCIPconsGetType     
+
+#define _INF std::numeric_limits<double>::infinity();
+
+using namespace std;
+using namespace NGraph;
+
+Graph A;
+
+
+void algtr(int,int,int,int,int*,vector<int>*,vector<vector<double> >*,vector<vector<double> >*,vector<vector<double> >*,vector<vector<double> >*,vector<int>*,vector<double>*,int);
+int sol(int,vector<vector<double> >*,vector<vector<double> >*,int,double,int*);
+
+static
+SCIP_RETCODE complementarity_knapsack(SCIP* scip)
+{
+  time_t tstart, tend;
+  tstart = time(0);
+
+  
+  SCIP_CONS** cons=SCIPgetConss(scip);
+  SCIP_VAR** vars=SCIPgetVars(scip); 
+  SCIP_VAR** varslin=SCIPgetVarsLinear(scip,cons[0]);
+  int numbercons=SCIPgetNConss(scip); //number of constraints
+  int items=SCIPgetNVars(scip); // number of items
+  SCIP_Real c=SCIPgetRhsLinear(scip,cons[0]);  //c=capacity
+
+
+
+ 	
+  //create vector of weights
+  vector<double> w_items(items+1);
+  vector<int> p_items(items+1);
+
+  /*
+  int n=items;
+  SCIP_Real* getvalslin= SCIPgetValsLinear(scip,cons[0]);             //geht nicht wenn ein koeff Null
+  for (int i=0; i<n; i++)
+  {
+    w.at(i)=getvalslin[i];
+    cout << endl << varslin[i] << "  " << getvalslin[i];
+  }
+  
+
+  
+  //create vector of profit
+
+  for (int i=0; i<n; i++)
+  {
+
+    cout << endl << vars[i] << "  " << vargetobj;
+  }
+  */
+
+  
+
+  int n=1; // n=number of nodes (at present, only one node - the root node)
+  SCIP_Real* getvalslin= SCIPgetValsLinear(scip,cons[0]);
+  for (int i=0; i<items; i++)
+  {
+    if(vars[i]==varslin[n-1])
+    {
+      SCIP_Real vargetobj=SCIPvarGetObj(vars[i]);
+      p_items.at(n)=-vargetobj;
+      w_items.at(n)=getvalslin[n-1];
+      n+=1;     
+    }
+  }
+  
+  vector<double> w(n);
+  vector<int> p(n);
+  for (int i=1; i<n; i++)
+  {
+    p.at(i)=p_items.at(i);
+    w.at(i)=w_items.at(i);
+  }
+
+  //compute upper bound for objective value
+  int P=0;
+  for (int i=1; i<n; i++)
+  {
+    P+=p.at(i);
+  }
+
+  //compute maximum left hand side of constraint
+  double W=0;
+  for (int i=1; i<n; i++)
+  {
+    W+=w.at(i);
+  }
+
+  //define root node
+  int r=0;
+  p.at(0)=0;
+  w.at(0)=W+1;
+
+
+  //create conflict tree 
+  for (int i=1; i<numbercons; i++)
+  {
+    int numvarsSOS1=SCIPgetNVarsSOS1(scip,cons[i]);
+    if(numvarsSOS1>2)
+    {
+      std::cout << "no tree structure in complementarity constraints" << std::endl;
+      return SCIP_ERROR;
+    }
+    else if(numvarsSOS1==2)
+    {
+      SCIP_VAR** getvarssos=SCIPgetVarsSOS1(scip,cons[i]);
+      int save_getvar1=-1;
+      int save_getvar2=-1;
+      for (int j=0; j<n; j++)
+      {    
+        if(getvarssos[0]==varslin[j])
+        {
+          save_getvar1=j;
+        }
+        if(getvarssos[1]==varslin[j])
+        {
+          save_getvar2=j;
+        }
+        if(save_getvar1!=-1 && save_getvar2!=-1)
+        {
+          A.insert_undirected_edge(save_getvar1+1,save_getvar2+1);
+          break;
+        }
+      }
+    }
+    else // if((numvarsSOS1==1))
+    {
+      ////////// open
+    }
+  }
+
+  /*
+  double epsilon=0.01;
+  int p[n];
+  for (int j=0; j<n; j++)
+  {
+    p[j]=K*floor(p_double[j]/K);
+  }
+  */
+  
+
+  /*
+  A.insert_edge(0,1);
+  A.insert_edge(0,2);
+  A.insert_edge(1,3);
+  A.insert_edge(1,4);
+  A.insert_edge(3,7);
+  A.insert_edge(3,8);
+  A.insert_edge(2,5);
+  A.insert_edge(2,6);
+  
+  A.insert_edge(8,17);
+  A.insert_edge(8,18);
+  A.insert_edge(5,15);
+  A.insert_edge(5,16);
+  A.insert_edge(2,9);
+  A.insert_edge(2,10);
+  A.insert_edge(9,11);
+  A.insert_edge(9,12);
+  A.insert_edge(10,13);
+  A.insert_edge(10,14);
+    */
+
+  //int n=19;
+  //int p[19]={2,8,4,7,1,9,3,5,7,2,2,8,4,7,1,9,3,5,7};
+  //double w[19]={3,7,9,1,5,3,7,4,6,4,3,7,9,1,5,3,7,4,6};
+  //double c=17;
+  
+
+
+
+  //create matrix Z
+  //Z[i][j]=solution with minimal weight found in the subtree T(j) that leads to a profit of i
+  //with i included into the knapsack solution
+  vector<vector<double> > Z;  
+  Z = vector<vector<double> > (P+1);
+  for(int i = 0; i < P+1; i++)
+  {
+    Z[i] = vector<double>(n,W+1);
+  }
+
+  //create matrix Y
+  //Y[i][j]=solution with minimal weight found in the subtree T(j) that leads to a profit of i
+  //with i excluded from the the knapsack solution
+  vector<vector<double> > Y;  
+  Y = vector<vector<double> > (P+1);
+  for(int i = 0; i < P+1; i++)
+  {
+    Y[i] = vector<double>(n,W+1);
+  }
+  
+  //create matrix XZ
+  //XY[i][j]=to Y[i][j] associated solution vector (binary encoding)
+  vector<vector<double> > XZ;  
+  XZ = vector<vector<double> > (P+1);
+  for(int i = 0; i < P+1; i++)
+  {
+    XZ[i] = vector<double>(n,0);
+  }
+  
+  //create matrix XY
+  //XY[i][j]=to Z[i][j] associated solution vector (binary encoding)
+  vector<vector<double> > XY;  
+  XY = vector<vector<double> > (P+1);
+  for(int i = 0; i < P+1; i++)
+  {
+    XY[i] = vector<double>(n,0);
+  }
+
+
+  int mark_iterator;
+  vector<int> mark_node(n,0); // store which node is marked
+  mark_node.at(0)=1; // mark root node
+  mark_iterator=1;
+  
+  int parentnode=-1; // root node has no parent node
+
+  //compute Z,Y,XZ,XY
+  algtr(n,r,r,parentnode,&mark_iterator,&mark_node,&Z,&Y,&XZ,&XY,&p,&w,P);
+
+  int OBJVAL;
+  int _isZ=0;
+  double d;
+
+  //compute objective value s.t. x\in {0,1}^n
+  OBJVAL=sol(r,&Z,&Y,P,c,&_isZ);
+  //compute solution vector s.t. x\in {0,1}^n
+  double X;
+  if(_isZ==0)
+  {
+    X=XY.at(OBJVAL).at(0);
+    d=Y.at(OBJVAL).at(0);
+  }
+  else
+  {
+    X=XZ.at(OBJVAL).at(0);
+    d=Z.at(OBJVAL).at(0); 
+  }
+  int x[n];
+  for(int i=n-1;i>=0;i--)
+  {
+    double a;
+    a=X-pow(2.0,i);
+    if(a>=0)
+    {
+      X=a;
+      x[i]=1;
+    }
+    else
+    {
+      x[i]=0;
+    }
+  }
+
+  /*
+cout << "Die Matrix A lautet: " << endl;
+
+for(int i=0;i<P+1;i++)
+{
+  cout << endl << i << "   ";
+    for(int j=0;j<n;j++)
+    {
+      cout << Y.at(i).at(j) << "  ";
+    }
+    cout << endl;
+}
+  */
+
+
+
+
+  double OBJVAL_sol=OBJVAL;
+  double x_sol[n];
+  for(int i=0;i<n;i++)
+  {
+    x_sol[i]=x[i];
+  }
+
+
+
+  //for each upper right hand side of linear constraint compute objective value
+  vector<int> Data_rhs;
+  vector<int>::iterator iter_rhs;
+
+  for(int i=OBJVAL+1;i<P+1;i++)
+  {
+    double dw;
+    for(int j=0;j<2;j++)
+    {
+      if(j==0)
+      {
+        dw=Y.at(i).at(r);
+      }
+      else
+      {
+        dw=Z.at(i).at(r);
+      }
+      if(dw!=W+1)
+      {
+        Data_rhs.push_back(dw);
+      }
+    }
+  }
+
+
+  //compute solution vector and objective value s.t. x\in [0,1]^n
+  int OBJVAL_new;
+  int _isZ_new;
+  for (iter_rhs = Data_rhs.begin (); iter_rhs < Data_rhs.end (); ++iter_rhs)
+  {
+    OBJVAL_new=sol(r,&Z,&Y,P,*iter_rhs,&_isZ_new);
+    double X_new;
+    double d_new;
+    vector<int> xfrac;
+    vector<int>::iterator k;
+    for(int jn=0;jn<2;jn++)
+    {
+      if(jn==0)
+      {
+        X_new=XY.at(OBJVAL_new).at(r);
+        d_new=Y.at(OBJVAL_new).at(r);
+      }
+      else
+      {
+        X_new=XZ.at(OBJVAL_new).at(r);
+        d_new=Z.at(OBJVAL_new).at(r);
+      }
+      if (X_new!=X)
+      {
+        X=X_new;
+        double x_new[n];
+        for(int i=n-1;i>=0;i--)
+        {
+          double a;
+          a=X_new-pow(2.0,i);
+          if(a>=0)
+          {
+            X_new=a;
+            x_new[i]=1;
+            if(w.at(i)!=0)
+            {
+              xfrac.push_back(i);
+            }
+          }
+          else
+          {
+            x_new[i]=0;
+          } 
+        }
+        double save_frac=_INF;
+        int save_k=-1;
+        for (k = xfrac.begin (); k < xfrac.end (); ++k)
+        {
+	  double t=(d_new-c)/w.at(*k);
+	  double frac=p.at(*k)/w.at(*k);
+            if((t<=1)&&(frac<save_frac))
+            {
+            save_k=*k;
+            save_frac=frac;
+            }
+        }
+        xfrac.clear ();          
+        if(save_k!=-1)
+        {
+          double OBJVAL_new_double=0;
+          x_new[save_k]=1-(d_new-c)/w.at(save_k);
+          for(int rr=0;rr<n;rr++)
+          {
+            OBJVAL_new_double += x_new[rr]*p.at(rr);
+          }
+          if(OBJVAL_new_double>OBJVAL_sol)
+          {
+            OBJVAL_sol=OBJVAL_new_double;
+            for(int g=0;g<n;g++)
+            {
+              x_sol[g]=x_new[g];
+            }
+          }
+        }
+      }
+    }  
+  }
+
+
+  Data_rhs.clear ();
+  // delete [] Z;
+  //delete [] Y;
+  //delete [] XZ;
+  //delete [] XY;
+
+
+  cout << "Solution vector: " << endl;
+
+  for(int j=0;j<n;j++)
+  {
+      cout << x_sol[j] << "  ";
+  }
+  cout << endl;
+
+  cout << "Objective value = "<< OBJVAL_sol << endl;
+  
+  
+  tend = time(0); 
+  cout << "It took "<< difftime(tend, tstart) <<" second(s)."<< endl;
+  // system("PAUSE");
+  return SCIP_OKAY;
+}
+
+
+
+
+void algtr(int n,int r,int j,int parentnode,int* mark_iterator,vector<int>* mark_node,vector<vector<double> >* Z,vector<vector<double> >* Y,vector<vector<double> >* XZ,vector<vector<double> >* XY,vector<int>* p,vector<double>* w,int P)
+{  
+  (*Z).at((*p).at(j)).at(j)=(*w).at(j);
+  (*XZ).at((*p).at(j)).at(j)=pow(2.0,j);
+  (*Y).at(0).at(j)=0;
+  
+  if(j==r) // j=root node
+  {
+    for (int i=*mark_iterator; i<n; i++)
+    {
+      if((*mark_node).at(i)==0)
+      {
+        (*mark_node).at(i)=1;
+        *mark_iterator+=1;
+        A.insert_undirected_edge(r,i);
+        algtr(n,r,i,j,mark_iterator,mark_node,Z,Y,XZ,XY,p,w,P);
+        //break;
+      }
+    }
+  }
+  
+  Graph::vertex_set S = A.out_neighbors(j);
+  for (Graph::vertex_set::const_iterator t = S.begin(); t !=S.end(); t++)
+  {
+    if(*t!=parentnode)
+    {
+      (*mark_node).at(*t)=1;
+      parentnode=j;
+      if(j!=r)
+      {
+        algtr(n,r,*t,parentnode,mark_iterator,mark_node,Z,Y,XZ,XY,p,w,P);
+      }
+      vector<double> save_vector_1(P+1);
+      vector<double> save_vector_2(P+1);
+      vector<double> save_vectorXY(P+1);
+      vector<double> save_vectorXZ(P+1);
+      for (int nue=0; nue<P+1; nue++)
+      {
+        save_vector_1.at(nue)=(*Y).at(nue).at(j);
+        save_vector_2.at(nue)=(*Z).at(nue).at(j);
+        save_vectorXY.at(nue)=(*XY).at(nue).at(j);
+        save_vectorXZ.at(nue)=(*XZ).at(nue).at(j);
+      }
+
+      for (int d=0; d<P+1; d++)
+      {
+        int save_k=0;
+        int _isZ=0;
+        double v=_INF;
+        for (int k=0; k<d+1; k++)
+        {
+          double u;
+          int isZ;
+          if((*Y).at(k).at(*t)<=(*Z).at(k).at(*t))
+          {
+            u=(*Y).at(k).at(*t);
+            isZ=0;
+          }
+          else
+          {
+            u=(*Z).at(k).at(*t);
+            isZ=1;
+          }
+          u+=save_vector_1.at(d-k);
+          if(v>u)
+          {
+            v=u;
+            save_k=k;
+            _isZ=isZ;
+          }
+        }
+        (*Y).at(d).at(j)=v;
+        if(_isZ==0)
+        {
+          (*XY).at(d).at(j)=save_vectorXY.at(d-save_k)+(*XY).at(save_k).at(*t);
+        }
+        else
+        {
+          (*XY).at(d).at(j)=save_vectorXY.at(d-save_k)+(*XZ).at(save_k).at(*t);
+        }
+      }
+      for (int d=(*p).at(j); d<P+1; d++)
+      {
+        int save_k=0;
+        double v=_INF;
+        for (int k=0; k<d-(*p).at(j)+1; k++)
+        {
+          double u;
+          u=(*Y).at(k).at(*t);
+          u+=save_vector_2.at(d-k);
+          if(v>u)
+          {
+            v=u;
+            save_k=k;
+          }
+        }
+        (*Z).at(d).at(j)=v;
+        (*XZ).at(d).at(j)=save_vectorXZ.at(d-save_k)+(*XY).at(save_k).at(*t);
+      }
+    }
+  }
+}
+
+
+int sol(int j,vector<vector<double> >* Z,vector<vector<double> >* Y,int P,double c,int* _isZ)
+{
+  int OBJVAL=0;
+  int isZ;
+  for(int i=0;i<P+1;i++)
+  {
+    double u;
+    if((*Y).at(i).at(j)<=(*Z).at(i).at(j))
+    {
+      u=(*Y).at(i).at(j);
+      isZ=0;
+    }
+    else
+    {
+      u=(*Z).at(i).at(j);
+      isZ=1;
+    }
+    if(u<=c)
+    {
+      OBJVAL=i;
+      *_isZ=isZ;
+    }
+  }
+return OBJVAL;
+}
