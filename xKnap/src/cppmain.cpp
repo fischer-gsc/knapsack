@@ -25,7 +25,7 @@
 #include "scip/scip.h"
 #include "objscip/objscip.h"
 #include "objscip/objscipdefplugins.h"
-#include "abc.hpp"
+#include "cutgen.hpp"
 
 /** reads parameters */
 static
@@ -115,7 +115,7 @@ SCIP_RETCODE fromCommandLine(
    cout << "Objective value = "<< OBJVAL << endl;
    */
 
-   SCIP_CALL(complementarity_knapsack(scip));
+   SCIP_CALL(cutgen(scip));
 
    return SCIP_OKAY;
 }
