@@ -5,45 +5,23 @@
 using namespace NGraph;
 
 static
-SCIP_RETCODE conflict_problem(SCIP* scip,         //SCIP data structure 
-			      int n,              //number of variables
-			      int numbercons,     //number of constraints
-                              int d,              //constraint being considered
-			      SCIP_VAR** vars,    //variables of scip
-			      SCIP_CONS** cons,   //constraints of scip
-                              double* x_star,     //solution of LP relax.
-                              double* w,          //pointer to store solution of conflict problem
-                              double* OBJVAL,     //pointer to store objective value of conflict problem
-                              Graph* A            //pointer to store conflict graph of conflict problem
+SCIP_RETCODE conflict_problem(SCIP* scip,             //SCIP data structure 
+			      int n,                  //number of variables
+			      int numbercons,         //number of constraints
+                              int d,                  //constraint being considered
+                              int n_vars_cons_d,      //number of variables of constraint d
+                              SCIP_VAR** vars_cons_d, //vars of constraint d
+                              SCIP_Real* a,           //values of constraint d
+			      SCIP_VAR** vars,        //variables of scip
+			      SCIP_CONS** cons,       //constraints of scip
+                              double* x_star,         //solution of LP relax.
+                              double* w,              //pointer to store solution of conflict problem
+                              double* OBJVAL,         //pointer to store objective value of conflict problem
+                              int* null_norm_w,       //pointer to store the null (quasi) norm of w   
+                              Graph* A                //pointer to store conflict graph of conflict problem
 			      )
 {
   ostringstream namebuf;
-
-  ///////////////////////////////
-  // get data of constraint d  //
-  ///////////////////////////////
-
-  const char* name_cons_d=SCIPconsGetName(cons[d]);        //name of constraint d
-  SCIP_VAR** vars_cons_d=SCIPgetVarsLinear(scip,cons[d]);  //vars of constraint d
-  // xxx varslin
-  SCIP_Real b= SCIPgetRhsLinear(scip,cons[d]);             //rhs of constraint d
-  SCIP_Real* a= SCIPgetValsLinear(scip,cons[d]);           //values of constraint d
-  int n_vars_cons_d=SCIPgetNVarsLinear(scip,cons[d]);      //number of variables of constraint d    
-  // xxx numvarslinear
-
-  // vector to store position of variables of constraint d
-  int posvars_cons_d[n_vars_cons_d];
-  // xxx posvarslin
-
-  int vars_it=0; //iterator
-  for (int i=0; i<n; i++)
-  {
-    if(vars[i]==vars_cons_d[vars_it])
-    {
-      posvars_cons_d[vars_it]=i;
-      vars_it+=1;
-    }
-  }
 
 
   //////////////////////////////
@@ -60,7 +38,7 @@ SCIP_RETCODE conflict_problem(SCIP* scip,         //SCIP data structure
   // create the variables of the conflict problem //
   //////////////////////////////////////////////////
   SCIP_VAR *  vars_conf[n_vars_cons_d]; 
-  vars_it=0;     //vars iterator
+  int vars_it=0;     //vars iterator
   int cons_it=0; //cons iterator
   for (int i=0; i<n_vars_cons_d; i++)
   {
@@ -154,10 +132,16 @@ SCIP_RETCODE conflict_problem(SCIP* scip,         //SCIP data structure
 
   SCIP_CALL( SCIPsolve(conf) );  
   SCIP_SOL* sol_conf = SCIPgetBestSol(conf); 
-  *OBJVAL= SCIPgetSolOrigObj(conf,sol_conf); 
+  *OBJVAL= SCIPgetSolOrigObj(conf,sol_conf);
+  
+  *null_norm_w=0;
   for (int i=0; i<n_vars_cons_d; i++)
   {
     w[i]=SCIPgetSolVal(conf,sol_conf,vars_conf[i]);
+    if(w[i]>0.5)  //(w[i]==1)
+    {
+      *null_norm_w+=1;
+    }
   }
 
 
