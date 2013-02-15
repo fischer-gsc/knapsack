@@ -16,10 +16,8 @@
 using namespace std;
 using namespace NGraph;
 
-Graph compGraph;
 
-
-void algtr(int,int,int,int,int*,vector<int>*,vector<vector<double> >*,vector<vector<double> >*,vector<vector<double> >*,vector<vector<double> >*,vector<int>*,vector<double>*,int);
+void algtr(int,int,int,int,int*,vector<int>*,vector<vector<double> >*,vector<vector<double> >*,vector<vector<double> >*,vector<vector<double> >*,vector<int>*,vector<double>*,int,Graph* compGraph);
 int sol(int,vector<vector<double> >*,int,double);
 
 static
@@ -27,6 +25,9 @@ SCIP_RETCODE complementarity_knapsack(SCIP* scip,double* x_sol,double* OBJVAL_so
 {
   time_t tstart, tend;
   tstart = time(0);
+
+Graph compGraph;
+
 
   //SCIP_CALL(SCIPpresolve(scip)); 
   
@@ -189,7 +190,7 @@ SCIP_RETCODE complementarity_knapsack(SCIP* scip,double* x_sol,double* OBJVAL_so
   int parentnode=-1; // root node has no parent node
 
   //compute Z,Y,XZ,XY
-  algtr(n,r,r,parentnode,&mark_iterator,&mark_node,&Z,&Y,&XZ,&XY,&p,&w,P);
+  algtr(n,r,r,parentnode,&mark_iterator,&mark_node,&Z,&Y,&XZ,&XY,&p,&w,P,&compGraph);
 
   int OBJVAL;
   double d;
@@ -241,7 +242,12 @@ SCIP_RETCODE complementarity_knapsack(SCIP* scip,double* x_sol,double* OBJVAL_so
   }
   
 
-
+  Z.clear ();
+  Y.clear ();
+  XZ.clear ();
+  XY.clear ();
+  w.clear ();
+  p.clear ();
 
   // delete [] Z;
   //delete [] Y;
@@ -259,7 +265,7 @@ SCIP_RETCODE complementarity_knapsack(SCIP* scip,double* x_sol,double* OBJVAL_so
 
 
 
-void algtr(int n,int r,int j,int parentnode,int* mark_iterator,vector<int>* mark_node,vector<vector<double> >* Z,vector<vector<double> >* Y,vector<vector<double> >* XZ,vector<vector<double> >* XY,vector<int>* p,vector<double>* w,int P)
+void algtr(int n,int r,int j,int parentnode,int* mark_iterator,vector<int>* mark_node,vector<vector<double> >* Z,vector<vector<double> >* Y,vector<vector<double> >* XZ,vector<vector<double> >* XY,vector<int>* p,vector<double>* w,int P,Graph* compGraph)
 {  
   (*Z).at((*p).at(j)).at(j)=(*w).at(j);
   (*XZ).at((*p).at(j)).at(j)=pow(2.0,j);
@@ -273,14 +279,14 @@ void algtr(int n,int r,int j,int parentnode,int* mark_iterator,vector<int>* mark
       {
         (*mark_node).at(i)=1;
         *mark_iterator+=1;
-        compGraph.insert_undirected_edge(r,i);
-        algtr(n,r,i,j,mark_iterator,mark_node,Z,Y,XZ,XY,p,w,P);
+        (*compGraph).insert_undirected_edge(r,i);
+        algtr(n,r,i,j,mark_iterator,mark_node,Z,Y,XZ,XY,p,w,P,compGraph);
         //break;
       }
     }
   }
   
-  Graph::vertex_set S = compGraph.out_neighbors(j);
+  Graph::vertex_set S = (*compGraph).out_neighbors(j);
   for (Graph::vertex_set::const_iterator t = S.begin(); t !=S.end(); t++)
   {
     if(*t!=parentnode)
@@ -289,7 +295,7 @@ void algtr(int n,int r,int j,int parentnode,int* mark_iterator,vector<int>* mark
       parentnode=j;
       if(j!=r)
       {
-        algtr(n,r,*t,parentnode,mark_iterator,mark_node,Z,Y,XZ,XY,p,w,P);
+        algtr(n,r,*t,parentnode,mark_iterator,mark_node,Z,Y,XZ,XY,p,w,P,compGraph);
       }
       vector<double> save_vector_1(P+1);
       vector<double> save_vector_2(P+1);

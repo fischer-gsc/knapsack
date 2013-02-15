@@ -1,0 +1,82 @@
+#define delta 0.001; //error tol
+
+static
+SCIP_RETCODE conflict_problem(SCIP* scip,         //SCIP data structure 
+			      int n,              //number of variables
+			      int numbercons,     //number of constraints
+                              int d,              //constraint being considered
+			      SCIP_VAR** vars,    //variables of scip
+			      SCIP_CONS** cons,   //constraints of scip
+                              double* x_star      //solution of LP relax.  
+			      )
+{
+  ostringstream namebuf;
+
+  ///////////////////////////////
+  // get data of constraint d  //
+  ///////////////////////////////
+
+  const char* name_cons_d=SCIPconsGetName(cons[d]);        //name of constraint d
+  SCIP_VAR** vars_cons_d=SCIPgetVarsLinear(scip,cons[d]);  //vars of constraint d
+  // xxx varslin
+  SCIP_Real b= SCIPgetRhsLinear(scip,cons[d]);             //rhs of constraint d
+  SCIP_Real* a= SCIPgetValsLinear(scip,cons[d]);           //values of constraint d
+  int n_vars_cons_d=SCIPgetNVarsLinear(scip,cons[d]);      //number of variables of constraint d    // xxx numvarslinear
+
+  // vector to store position of variables of constraint d
+  int posvars_cons_d[n_vars_cons_d];
+  // xxx posvarslin
+
+  int vars_it=0; //iterator
+  for (int i=0; i<n; i++)
+  {
+    if(vars[i]==vars_cons_d[vars_it])
+    {
+      posvars_cons_d[vars_it]=i;
+      vars_it+=1;
+    }
+  }
+
+
+  //////////////////////////////
+  // create conflict problem  //
+  //////////////////////////////
+
+  SCIP* conf = NULL;
+  SCIP_CALL( SCIPcreate(&conf) );
+  SCIP_CALL( SCIPincludeDefaultPlugins(conf) );
+  SCIP_CALL( SCIPcreateProbBasic(conf, "conf") );
+  SCIP_CALL(SCIPsetObjsense(conf, SCIP_OBJSENSE_MAXIMIZE));
+
+  //create the variables of the conflict problem
+  SCIP_VAR *  vars_conf[n_vars_cons_d]; 
+  vars_it=0; //iterator
+  for (int i=0; i<n_vars_cons_d; i++)
+  {
+     SCIP_VAR * var_conf;
+     namebuf.str("");
+     namebuf << "x_conf#" << i;
+
+     // create the SCIP_VAR object
+    for (int j=vars_it; j<n; j++)
+    {
+      if(vars[vars_it]==vars_cons_d[i])
+      {
+        SCIP_CALL( SCIPcreateVarBasic(conf, &var_conf, namebuf.str().c_str(), 0.0, 1.0 ,a[i], SCIP_VARTYPE_BINARY) );
+        double error_tol=delta;
+        if(x_star[vars_it]<error_tol)
+        {
+	  /////////////add constraint!!!
+        }
+        vars_it+=1;
+	break;
+      }
+    vars_it+=1;
+    }
+  }
+ 
+
+  return SCIP_OKAY;
+}
+
+

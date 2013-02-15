@@ -312,64 +312,101 @@ SCIP_RETCODE cutgen(SCIP* scip)
 	}
       }
 
-      /////////////////
-      int k=6;/////// lifting variable
-      //for (int chi=0; chi<n; chi++)
-      //{
-      //  if(chi!=cover[cover_iterator])&&(chi!=posvarslin[change]))//(posvarslin[change]=nue)
-      double a_k;
-      int visit=0;
+      //start lifting
+      int cover_iterator=0;
+      int cover_var;
       int iterator_varslinear=0;
-      for (int j=iterator_varslinear; j<numvarslinear; j++)
+      for (int chi=0; chi<n; chi++)
       {
-        if(posvarslin[j]==k)
-	{
-          a_k=a[j];
-          iterator_varslinear+=1;
-          visit=1;
-          break;
-	}
-      }
-      if(visit==0)
-      {
-        a_k=0.0;
-      }
-      ///////////
-    
+        if(cover_iterator>=size_cover)
+        {
+          cover_var=-1;
+        }
+        else
+        {
+          cover_var=cover[cover_iterator];
+        }
 
-      Graph::vertex_set S1 = Gr.out_neighbors(k);
-      for (Graph::vertex_set::const_iterator t = S1.begin(); t !=S1.end(); t++)
-      {
-	SCIP_CALL( SCIPchgVarObj(lift,vars_lift[*t],0.0) );
-      }   
+        if(chi==cover_var)
+        {
+          cover_iterator+=1;
+        }
+        else if((chi!=cover_var)&&(chi!=posvarslin[change]))  //(posvarslin[change]=nue)
+        {
+          int k=chi;// k=lifting_index
+          double a_k;
+          int visit=0;
+
+          for (int j=iterator_varslinear; j<numvarslinear; j++)
+          {
+            if(posvarslin[j]==k)
+            {
+              a_k=a[j];
+              iterator_varslinear+=1;
+              visit=1;
+              break;
+            }
+          }
+          if(visit==0)
+          {
+            a_k=0.0;
+            continue;
+          }
+
+    
+          vector<double> save_varobj;
+          Graph::vertex_set S1 = Gr.out_neighbors(k);
+          for (Graph::vertex_set::const_iterator t = S1.begin(); t !=S1.end(); t++)// set x_i=0 for i neighbor of k
+          {
+             save_varobj.push_back(SCIPvarGetObj(vars_lift[*t]));
+             SCIP_CALL( SCIPchgVarObj(lift,vars_lift[*t],0.0) );
+          }   
       
 
-       double OBJVAL_knap;
-       int items=SCIPgetNVars(lift);
-       double *x_knap;
-       x_knap = new double[items];
-       vector<double> lhs_values;
-       vector<double> obj_values;
-       SCIP_CALL(complementarity_knapsack(lift,x_knap,&OBJVAL_knap,&lhs_values,&obj_values,a_k));
-       int size_lhs_values= static_cast<int>(lhs_values.size ());  
-       double y;
-       double f_y;
-       double alpha;
-       double alpha_save=_INF;
-       for(int j=0;j<size_lhs_values;j++)
-       {
-         y=(b-lhs_values[j])/a_k;
-         f_y=b-obj_values[j];
-         alpha=f_y/y;
-         if(alpha<alpha_save)
-	 {
-           alpha_save=alpha;
-	 }
-       }
-       alpha=alpha_save;
-       //change objective value
-       SCIP_CALL( SCIPchgVarObj(lift,vars_lift[k],alpha));
+           double OBJVAL_knap;
+           int items=SCIPgetNVars(lift);
+           double *x_knap;
+           x_knap = new double[items];
+           vector<double> lhs_values;
+           vector<double> obj_values;
 
+
+           SCIP_CALL(complementarity_knapsack(lift,x_knap,&OBJVAL_knap,&lhs_values,&obj_values,a_k));
+
+           int size_lhs_values= static_cast<int>(lhs_values.size ());  
+           double y;
+           double f_y;
+           double alpha;
+           double alpha_save=_INF;
+           for(int j=0;j<size_lhs_values;j++)
+           {
+             y=(b-lhs_values[j])/a_k;
+             f_y=b-obj_values[j];
+             alpha=f_y/y;
+             if(alpha<alpha_save)
+	     {
+               alpha_save=alpha;
+	     }
+           }
+           alpha=alpha_save;
+           cout << endl << "k=  " << k;
+           cout << endl << "alpha= " << alpha;
+           //change objective value
+           SCIP_CALL( SCIPchgVarObj(lift,vars_lift[k],alpha));
+	   
+           int S1_it=0;
+           for (Graph::vertex_set::const_iterator t = S1.begin(); t !=S1.end(); t++) // redo x_i=0 for i neighbor of k
+           {
+             SCIP_Real f=save_varobj.at(S1_it);
+             SCIP_CALL( SCIPchgVarObj(lift,vars_lift[*t],f) );
+             S1_it+=1;
+           }  
+	   
+           lhs_values.clear ();
+           obj_values.clear ();
+           delete [] x_knap;
+
+	   
        /*
       // set x_i=0 for all i \in {1,...,n}\cover
       int cover_iterator=0;
@@ -401,7 +438,21 @@ SCIP_RETCODE cutgen(SCIP* scip)
       cout << endl << "objval= " << objval_lift;
       cout << endl << "f[y]= " << b-objval_lift;
        */
-      
+	}
+      }
+      SCIP_CONS** cons_lift_new=SCIPgetConss(lift);
+      SCIP_VAR** vars_lift_new=SCIPgetVars(lift);
+      int numbercons_lift=SCIPgetNConss(lift); //number of constraints
+      int numbervars_lift=SCIPgetNVars(lift); // number of vars
+      for(int j=0;j<numbervars_lift;j++)
+      {
+        SCIP_CALL(SCIPreleaseVar(lift, &vars_lift_new[j]) );
+      }
+      for(int j=0;j<numbercons_lift;j++)
+      {
+        SCIP_CALL( SCIPreleaseCons(lift, &cons_lift_new[j]) );
+      }
+       SCIP_CALL(SCIPfree(&lift) );
     } //end  if(objval_conf>b) 
    
 
