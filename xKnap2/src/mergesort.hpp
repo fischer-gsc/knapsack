@@ -1,8 +1,8 @@
 // QUELLE: http://ankitstar.blogspot.de/2011/05/merge-sort.html
 
-void merge(double[],int[],int,int,int);
+void merge(vector<double>*,vector<int>*,int,int,int);
 
-void mergesort(double a[],int merke[],int p,int r) // a=Vector of length n ,p=0,r=n-1
+void mergesort(vector<double>* a,vector<int>* merke,int p,int r) // a=Vector of length n ,p=0,r=n-1
 {
      if( p < r)
     {
@@ -12,7 +12,7 @@ void mergesort(double a[],int merke[],int p,int r) // a=Vector of length n ,p=0,
          merge(a,merke,p,q,r);
      }
 }
-void merge(double a[],int merke[],int p,int q,int r)
+void merge(vector<double>* a,vector<int>* merke,int p,int q,int r)
 {
 double c[10];
 double d[10];
@@ -21,40 +21,40 @@ int j=q+1;
 int k=p;
 while((i<=q)&&(j<=r))
 {
-if(a[i]<a[j])
-{
-     c[k]=a[i];
-     d[k]=merke[i];
-     i=i+1;
-     k=k+1;
-}
-else
-{
-     c[k]=a[j];
-     d[k]=merke[j];
-      j=j+1;
-      k=k+1;
-}
+  if((*a).at(i)<(*a).at(j))
+  {
+    c[k]=(*a).at(i);
+    d[k]=(*merke).at(i);
+    i=i+1;
+    k=k+1;
+  }
+  else
+  {
+    c[k]=(*a).at(j);
+    d[k]=(*merke).at(j);
+    j=j+1;
+    k=k+1;
+  }
 }
 while(i<=q)
 {
-     c[k] =a[i];
-     d[k]=merke[i];
-     i=i+1;
-     k=k+1;
+  c[k] =(*a).at(i);
+  d[k]=(*merke).at(i);
+  i=i+1;
+  k=k+1;
 }
 while(j<=r)
 {
-     c[k]=a[j];
-     d[k]=merke[j];
-     j=j+1;
-     k=k+1;
+  c[k]=(*a).at(j);
+  d[k]=(*merke).at(j);
+  j=j+1;
+  k=k+1;
 }
 int l=p;
 while(l<=r)
 {
-     a[l]=c[l];
-     merke[l]=d[l];
-     l=l+1;
+  (*a).at(l)=c[l];
+  (*merke).at(l)=d[l];
+  l=l+1;
 }
 }

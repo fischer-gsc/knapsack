@@ -26,7 +26,7 @@ SCIP_RETCODE complementarity_knapsack(SCIP* scip,double* x_sol,double* OBJVAL_so
   time_t tstart, tend;
   tstart = time(0);
 
-Graph compGraph;
+  Graph compGraph;
 
 
   //SCIP_CALL(SCIPpresolve(scip)); 
@@ -124,7 +124,8 @@ Graph compGraph;
           }
           if(save_getvar1!=-1 && save_getvar2!=-1)
           {
-            compGraph.insert_undirected_edge(save_getvar1+1,save_getvar2+1);
+            compGraph.insert_edge(save_getvar1+1,save_getvar2+1);
+            compGraph.insert_edge(save_getvar2+1,save_getvar1+1);
             break;
           }
 	}
@@ -279,7 +280,8 @@ void algtr(int n,int r,int j,int parentnode,int* mark_iterator,vector<int>* mark
       {
         (*mark_node).at(i)=1;
         *mark_iterator+=1;
-        (*compGraph).insert_undirected_edge(r,i);
+        (*compGraph).insert_edge(r,i);
+        (*compGraph).insert_edge(i,r);
         algtr(n,r,i,j,mark_iterator,mark_node,Z,Y,XZ,XY,p,w,P,compGraph);
         //break;
       }

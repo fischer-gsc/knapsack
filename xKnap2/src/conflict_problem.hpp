@@ -1,8 +1,16 @@
-
+#include "scip/pub_var.h"
 
 #define delta 0.001; //error tol
 
+using namespace std;
 using namespace NGraph;
+
+
+struct SCIP_VarData
+{
+  int index;
+};
+
 
 static
 SCIP_RETCODE conflict_problem(SCIP* scip,             //SCIP data structure 
@@ -12,8 +20,11 @@ SCIP_RETCODE conflict_problem(SCIP* scip,             //SCIP data structure
                               int n_vars_cons_d,      //number of variables of constraint d
                               SCIP_VAR** vars_cons_d, //vars of constraint d
                               SCIP_Real* a,           //values of constraint d
+                              int* posvars_obj_d,     //position of variables of obj in cons d
+                                                      //( -1 if variable does not exist )
+                              SCIP_VARDATA* vardata,  //vector with indices of variables of obj
 			      SCIP_VAR** vars,        //variables of scip
-			      SCIP_CONS** cons,       //constraints of scip
+                              SCIP_CONS** cons,       //constraints of scip
                               double* x_star,         //solution of LP relax.
                               double* w,              //pointer to store solution of conflict problem
                               double* OBJVAL,         //pointer to store objective value of conflict problem
@@ -22,7 +33,6 @@ SCIP_RETCODE conflict_problem(SCIP* scip,             //SCIP data structure
 			      )
 {
   ostringstream namebuf;
-
 
   //////////////////////////////
   // create conflict problem  //
@@ -37,9 +47,10 @@ SCIP_RETCODE conflict_problem(SCIP* scip,             //SCIP data structure
   //////////////////////////////////////////////////
   // create the variables of the conflict problem //
   //////////////////////////////////////////////////
-  SCIP_VAR *  vars_conf[n_vars_cons_d]; 
+
+  SCIP_VAR* vars_conf[n_vars_cons_d]; //vector to store variables
   int vars_it=0;     //vars iterator
-  int cons_it=0; //cons iterator
+  int cons_it=0;     //cons iterator
   for (int i=0; i<n_vars_cons_d; i++)
   {
      SCIP_VAR * var_conf;
@@ -83,45 +94,45 @@ SCIP_RETCODE conflict_problem(SCIP* scip,             //SCIP data structure
   // create the SOS1 constraints and the conflict graph of the conflict problem //
   ////////////////////////////////////////////////////////////////////////////////
 
+  int numvarsSOS1;
+  SCIP_VAR** getvarssos;
+  SCIP_VARDATA *vardataout0;
+  SCIP_VARDATA *vardataout1;
+  int node1;
+  int node2;
+
   cons_it=0; // cons iterator
   //create SOS1 constraints
   for (int i=0; i<numbercons; i++)
   {
     if(strcmp(SCIPconshdlrGetName(SCIPconsGetHdlr(cons[i])), "SOS1") == 0)
     {
-      int numvarsSOS1=SCIPgetNVarsSOS1(scip,cons[i]);
-      SCIP_VAR** getvarssos=SCIPgetVarsSOS1(scip,cons[i]);
-      int save_getvar1=-1;
-      int save_getvar2=-1;
+      numvarsSOS1=SCIPgetNVarsSOS1(scip,cons[i]);
       if(numvarsSOS1==2)
       {
-        for (int j=0; j<n_vars_cons_d; j++)
-        {    
-          if(getvarssos[0]==vars_cons_d[j])
-          {
-            save_getvar1=j;
-          }
-          if(getvarssos[1]==vars_cons_d[j])
-          {
-            save_getvar2=j;
-          }
-          if(save_getvar1!=-1 && save_getvar2!=-1)
-          {
-            (*A).insert_undirected_edge(save_getvar1,save_getvar2);
-            SCIP_CONS * sos1;
-            namebuf.str("");
-            namebuf<<"sosrow_"<<cons_it; 
-            // create SCIP_CONS object
-            SCIP_CALL( SCIPcreateConsBasicSOS1( conf, &sos1, namebuf.str().c_str(), 0, NULL, NULL ) ); 
-            // add variables to the SOS1 constraint
-            SCIP_CALL( SCIPappendVarSOS1(conf, sos1, vars_conf[save_getvar1]) );
-            SCIP_CALL( SCIPappendVarSOS1(conf, sos1, vars_conf[save_getvar2]) );
-            // add the constraint to scip
-            SCIP_CALL( SCIPaddCons(conf, sos1) );
-            cons_it+=1;
-            break;
-          }
-	}
+        getvarssos=SCIPgetVarsSOS1(scip,cons[i]);
+        vardataout0=SCIPvarGetData(getvarssos[0]);
+        vardataout1=SCIPvarGetData(getvarssos[1]);
+        node1=posvars_obj_d[(*vardataout0).index];
+        node2=posvars_obj_d[(*vardataout1).index];
+        if((node1!=-1)&&(node2!=-1))
+	{
+        //add edge to conflict graph A
+        (*A).insert_edge(node1,node2);
+        (*A).insert_edge(node2,node1);
+        //create constraint
+        SCIP_CONS * sos1;
+        namebuf.str("");
+        namebuf<<"sosrow_"<<cons_it; 
+        // create SCIP_CONS object
+        SCIP_CALL( SCIPcreateConsBasicSOS1( conf, &sos1, namebuf.str().c_str(), 0, NULL, NULL ) ); 
+        // add variables to the SOS1 constraint
+        SCIP_CALL( SCIPappendVarSOS1(conf, sos1, vars_conf[node1]) );
+        SCIP_CALL( SCIPappendVarSOS1(conf, sos1, vars_conf[node2]) );
+        // add the constraint to scip
+        SCIP_CALL( SCIPaddCons(conf, sos1) );
+        cons_it+=1;
+        }
       }
     }
   }
