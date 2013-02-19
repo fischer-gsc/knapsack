@@ -22,16 +22,17 @@ int sol(int,vector<vector<double> >*,int,double);
 
 static
 SCIP_RETCODE complementarity_knapsack(
-                                       Graph* compGraph,
-				       vector<double>* w,
-				       vector<int>* p,
-                                       double* x_sol,
-                                       double* OBJVAL_sol,
-                                       vector<double> * lhs_values,
-                                       vector<double> * obj_values,
+				       Graph* compGraph,              //conflict graph (forest consisting of tree subgraphs)
+				       vector<double>* w,             //vector of weights
+				       vector<int>* p,                //vector of profits
+                                       double* x_sol,                 //pointer to store solution
+                                       double* OBJVAL_sol,            //pointer to store objective value
+                                       vector<double> * lhs_values,   //pointer to store lhs-values of linear constraint
+                                                                      //for every rhs<=c  
+                                       vector<double> * obj_values,   //pointer to store obj.-values for every rhs<=c
                                        SCIP_Real c,                   //right hand side of constraint d
-                                       double a_k,
-                                       int items
+                                       double a_k,                    //coefficient of lifting index
+                                       int items                      //number of items
                                      )
 {
   time_t tstart, tend;
@@ -146,11 +147,11 @@ SCIP_RETCODE complementarity_knapsack(
   //for each upper right hand side of linear constraint compute objective value
   vector<int> Data_rhs;
 
-  for(int i=0;i<OBJVAL;i++)
+  for(int i=0;i<=OBJVAL;i++)
   {
-    double dw;
+    double dw; //left hand side of linear constraint
     dw=Y.at(i).at(r);
-    if((dw<=c)&&(dw>=dw-a_k))
+    if((dw<=c)&&(dw>=c-a_k))    // c-1*a_k <= lhs <=c- 0*a_k
     {
       (*lhs_values).push_back(dw);
       (*obj_values).push_back(i);
@@ -166,7 +167,6 @@ SCIP_RETCODE complementarity_knapsack(
 
   tend = time(0); 
   cout << "It took "<< difftime(tend, tstart) <<" second(s)."<< endl;
-  // system("PAUSE");
 
   return SCIP_OKAY;
 }

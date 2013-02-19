@@ -1,4 +1,5 @@
-//////////#include "scip/pub_var.h"
+
+#define _INF std::numeric_limits<double>::infinity();
 
 using namespace std;
 using namespace NGraph;
@@ -107,6 +108,10 @@ SCIP_RETCODE lifting(
     // create the conflict Graph of the lifting problem //
     //////////////////////////////////////////////////////
 
+    // remark:
+    // conflict graph of lifting problem ^= subgraph of conflict graph
+    // of conflict problem
+
     Graph::vertex_set S;
     for (int j = 0; j < size_L_wo_N_k; ++j)
     {
@@ -117,6 +122,16 @@ SCIP_RETCODE lifting(
     Graph sub_Gr=(*Gr_conf).subgraph(S);
     
 
+
+    //we have to change indices of vertex nodes
+    
+    //Example: {2,5,6} -> {0,1,2}
+    //define ind_ind_d with
+    //ind_ind_d[2]=0
+    //ind_ind_d[5]=1
+    //ind_ind_d[6]=2
+    //ind_ind_d[i]=-1 if i not \in {2,5,6}
+    
     int *ind_in_d;
     ind_in_d = new int[n_vars_cons_d];
     it=0;
@@ -136,6 +151,7 @@ SCIP_RETCODE lifting(
       }
     }
 
+    //create conflict graph with changed vertex indices 
 
     Graph compGraph;
     for (int i = 0;  i< size_L_wo_N_k; ++i)
@@ -153,16 +169,45 @@ SCIP_RETCODE lifting(
     }
 
 
-
-    double OBJVAL_knap;
-    int items=size_L_wo_N_k;
-    double *x_knap;
+    double OBJVAL_knap;          //objective value of knapsack problem
+    int items=size_L_wo_N_k;     //number of items
+    double *x_knap;              //solution vector of knapsack problem
     x_knap = new double[items];
-    vector<double> lhs_values;
-    vector<double> obj_values;
+    vector<double> lhs_values;   //vector to store lhs-values of linear 
+                                 //constraint for every rhs<=c 
+    vector<double> obj_values;   //vector to store obj.-values for every rhs<=c
 
 
+    //solve knapsack problem s.t. x \in {0,1}^n
+    //in addition, get all solutions for smaller rhs
     SCIP_CALL(complementarity_knapsack(&compGraph,&w,&p,x_knap,&OBJVAL_knap,&lhs_values,&obj_values,b,a_k,items));
+
+
+
+    int size_lhs_values= static_cast<int>(lhs_values.size ());  // size of vector lhs_values
+    double y;                    // y=a_k * x[k]
+    double f_y;                  // f(y)=b-z(y)     ( z(y)=sol of knapsack problem with rhs=b-a_k*y ) 
+    double alpha;                // alpha=lifting coefficient of x[k]
+    double alpha_save=_INF;
+    cout << endl << size_lhs_values;
+    for(int j=0;j<size_lhs_values;j++)
+    {
+      y=(b-lhs_values[j])/a_k;
+      if(y>1)
+      {
+        y=1;
+      }
+      f_y=b-obj_values[j];
+      cout << endl << y << endl <<"  "<< f_y;
+      alpha=f_y/y;              // y != 0 ??????
+      if(alpha<alpha_save)
+      {
+        alpha_save=alpha;
+      }
+    }
+    alpha=alpha_save;
+
+    cout << endl << alpha;
 
 
 
