@@ -1,5 +1,5 @@
-// 1.                   get scip data
-// 2.                   presolving 
+// 1.                   presolving
+// 2.                   get scip data
 // 3.                   compute x_star=solution of LP relax.
 // 4.                   create conflict graph
 // 5.                   for every linear constraint d: try to generate a cut
@@ -16,9 +16,20 @@
 
 
 
+
+struct SCIP_VarData
+{
+  int index;
+};
+
+
+
+
+
+//#define SCIP_DEBUG
 #include "ngraph/ngraph.hpp"
 #include "mergesort.hpp"
-//#include "complem_knap.hpp"
+#include "complem_knap.hpp"
 #include "LP_relax.hpp"
 #include "conflict_problem.hpp"
 #include "lifting.hpp"
@@ -33,31 +44,36 @@ using namespace NGraph;
 
 
 
+
 static
 SCIP_RETCODE cutgen(SCIP* scip)
 {
   ostringstream namebuf;
-  SCIP_CALL(SCIPsetMessagehdlr(scip,NULL)); //suppress messages
+
 
   double tol=delta;
   Graph Gr; //Gr = conflict Graph of scip
  
+
+  //////////////////////////
+  // 1.     presolving   //
+  //////////////////////////
+
+  //SCIP_CALL(SCIPpresolve(scip));
+
+  SCIP_CALL(SCIPsetMessagehdlr(scip,NULL)); //suppress messages
+
   /////////////////////////
-  // 1.   get scip data  //
+  // 2.   get scip data  //
   /////////////////////////
+
   SCIP_CONS** cons=SCIPgetConss(scip); // cons = constraints of scip
   SCIP_VAR** vars=SCIPgetVars(scip); //vars = variables of scip
   int numbercons=SCIPgetNConss(scip); //numbercons = number of constraints
   int n=SCIPgetNVars(scip); // n = number of items/variables
 
 
-
   // define indices of variables
-  struct SCIP_VarData
-  {
-    int index;
-  };
-
   SCIP_VARDATA vardata[n];
   for (int i=0; i<n; i++)
   {
@@ -66,20 +82,13 @@ SCIP_RETCODE cutgen(SCIP* scip)
   }
 
   
-  //////////////////////////
-  // 2.     presolving   //
-  //////////////////////////
-
-  SCIP_CALL(SCIPpresolve(scip));
-
-
   /////////////////////////////////////////////////
   // 3.    compute x_star=solution of LP relax. //
   /////////////////////////////////////////////////
 
   double *x_star;
   x_star = new double[n];
-  SCIP_CALL(LP_relax(scip,x_star)); 
+  SCIP_CALL(LP_relax(scip,cons,vars,numbercons,n,&vardata[n],x_star)); 
   
   /////////////////////////////////////
   // 4.     create conflict graph   //
@@ -318,7 +327,8 @@ SCIP_RETCODE cutgen(SCIP* scip)
 
           // determine I=complement of L (I in w_vars)
           int size_I=n_vars_cons_d-size_L;
-          int I[size_I];
+          int* I;
+          I = new int[size_I];
  
           int I_it=0; //I iterator
           L_it=0;     //L iterator 
@@ -338,7 +348,7 @@ SCIP_RETCODE cutgen(SCIP* scip)
 	    }
 	  }
 
-          SCIP_CALL(lifting(scip,n,numbercons,vars,cons,a,b,&Gr_conf,L,size_L));
+          SCIP_CALL(lifting(n_vars_cons_d,a,b,&Gr_conf,L,I,size_L));
 
 
 
@@ -346,6 +356,7 @@ SCIP_RETCODE cutgen(SCIP* scip)
 
 
           delete [] L;      //delete set L=C without N(nue) with nue
+          delete [] I;      //delete set I=complement of L
 	} //end if success==1 (nue detected)
       } //end check if a cover is at hand
 

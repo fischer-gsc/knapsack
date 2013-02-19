@@ -21,126 +21,43 @@ void algtr(int,int,int,int,int*,vector<int>*,vector<vector<double> >*,vector<vec
 int sol(int,vector<vector<double> >*,int,double);
 
 static
-SCIP_RETCODE complementarity_knapsack(SCIP* scip,double* x_sol,double* OBJVAL_sol,vector<double> * lhs_values,vector<double> * obj_values,double a_k)
+SCIP_RETCODE complementarity_knapsack(
+                                       Graph* compGraph,
+				       vector<double>* w,
+				       vector<int>* p,
+                                       double* x_sol,
+                                       double* OBJVAL_sol,
+                                       vector<double> * lhs_values,
+                                       vector<double> * obj_values,
+                                       SCIP_Real c,                   //right hand side of constraint d
+                                       double a_k,
+                                       int items
+                                     )
 {
   time_t tstart, tend;
   tstart = time(0);
 
-  Graph compGraph;
 
-
-  //SCIP_CALL(SCIPpresolve(scip)); 
-  
-  SCIP_CONS** cons=SCIPgetConss(scip);
-  int numbercons=SCIPgetNConss(scip); //number of constraints
-  SCIP_VAR** vars=SCIPgetVars(scip); 
-  int indexlinearcons;
-  for (int i=0; i<numbercons; i++)
-  {
-    if(strcmp(SCIPconshdlrGetName(SCIPconsGetHdlr(cons[i])), "linear") == 0)
-    {
-      indexlinearcons=i;
-      break;
-    }
-  }
-
-  SCIP_VAR** varslin=SCIPgetVarsLinear(scip,cons[indexlinearcons]);
-  int items=SCIPgetNVars(scip); // number of items
-  int n=items+1; //(items + root node)
-  SCIP_Real c=SCIPgetRhsLinear(scip,cons[indexlinearcons]);  //c=capacity
-
-
-
+  int n=items+1;
 	
-  //create vector of weights and vector of profits
-  int linvarsnr=0;
-  vector<double> w(n);
-  vector<int> p(n);
-  
-  SCIP_Real* getvalslin= SCIPgetValsLinear(scip,cons[indexlinearcons]);
-  for (int i=0; i<items; i++)
-  {
-    if(vars[i]==varslin[linvarsnr])
-    {
-      SCIP_Real vargetobj=SCIPvarGetObj(vars[i]);
-      p.at(i+1)=-vargetobj;
-      w.at(i+1)=getvalslin[linvarsnr];
-      linvarsnr+=1;     
-    }
-    else
-    {
-      SCIP_Real vargetobj=SCIPvarGetObj(vars[i]);
-      p.at(i+1)=-vargetobj;
-      w.at(i+1)=0;
-    }
-  }
-
-
   //compute upper bound for objective value
   int P=0;
-  for (int i=1; i<n; i++)
+  for (int i=0; i<items; i++)
   {
-    P+=p.at(i);
+    P+=(*p).at(i);
   }
 
   //compute maximum left hand side of constraint
   double W=0;
-  for (int i=1; i<n; i++)
+  for (int i=0; i<items; i++)
   {
-    W+=w.at(i);
+    W+=(*w).at(i);
   }
 
   //define root node
-  int r=0;
-  p.at(0)=0;
-  w.at(0)=W+1;
-
-
-  //create conflict tree 
-  for (int i=0; i<numbercons; i++)
-  {
-    if(strcmp(SCIPconshdlrGetName(SCIPconsGetHdlr(cons[i])), "SOS1") == 0)
-    {
-      int numvarsSOS1=SCIPgetNVarsSOS1(scip,cons[i]);
-      if(numvarsSOS1>2)
-      {
-        std::cout << "no tree structure in complementarity constraints" << std::endl;
-        return SCIP_ERROR;
-      }
-      else if(numvarsSOS1==2)
-      {
-        SCIP_VAR** getvarssos=SCIPgetVarsSOS1(scip,cons[i]);
-        int save_getvar1=-1;
-        int save_getvar2=-1;
-        for (int j=0; j<items; j++)
-        {    
-          if(getvarssos[0]==vars[j])
-          {
-            save_getvar1=j;
-          }
-          if(getvarssos[1]==vars[j])
-          {
-            save_getvar2=j;
-          }
-          if(save_getvar1!=-1 && save_getvar2!=-1)
-          {
-            compGraph.insert_edge(save_getvar1+1,save_getvar2+1);
-            compGraph.insert_edge(save_getvar2+1,save_getvar1+1);
-            break;
-          }
-	}
-      }
-    }
-  }
-
-  /*
-  double epsilon=0.01;
-  int p[n];
-  for (int j=0; j<n; j++)
-  {
-    p[j]=K*floor(p_double[j]/K);
-  }
-  */
+  int r=items;
+  (*p).push_back(0);
+  (*w).push_back(W+1);
 
 
 
@@ -183,24 +100,22 @@ SCIP_RETCODE complementarity_knapsack(SCIP* scip,double* x_sol,double* OBJVAL_so
   }
 
 
-  int mark_iterator;
   vector<int> mark_node(n,0); // store which node is marked
-  mark_node.at(0)=1; // mark root node
-  mark_iterator=1;
+  mark_node.at(r)=1; // mark root node
   
-  int parentnode=-1; // root node has no parent node
+  int parentnode=-1;    // root node has no parent node
+  int mark_iterator=0;  // number of visited nodes (root node excluded)
 
   //compute Z,Y,XZ,XY
-  algtr(n,r,r,parentnode,&mark_iterator,&mark_node,&Z,&Y,&XZ,&XY,&p,&w,P,&compGraph);
+  algtr(n,r,r,parentnode,&mark_iterator,&mark_node,&Z,&Y,&XZ,&XY,p,w,P,compGraph);
 
   int OBJVAL;
   double d;
 
-  //compute objective value s.t. x\in {0,1}^n
+  //compute objective value
   OBJVAL=sol(r,&Y,P,c);
 
-
-  //compute solution vector s.t. x\in {0,1}^n
+  //compute solution vector
   double X;
   X=XY.at(OBJVAL).at(r);
   d=Y.at(OBJVAL).at(r);
@@ -222,9 +137,9 @@ SCIP_RETCODE complementarity_knapsack(SCIP* scip,double* x_sol,double* OBJVAL_so
   }
 
   *OBJVAL_sol=OBJVAL;
-  for(int i=0;i<n-1;i++)
+  for(int i=0;i<items;i++)
   {
-    x_sol[i]=x[i+1];
+    x_sol[i]=x[i];
   }
 
   
@@ -247,13 +162,6 @@ SCIP_RETCODE complementarity_knapsack(SCIP* scip,double* x_sol,double* OBJVAL_so
   Y.clear ();
   XZ.clear ();
   XY.clear ();
-  w.clear ();
-  p.clear ();
-
-  // delete [] Z;
-  //delete [] Y;
-  //delete [] XZ;
-  //delete [] XY;
   
 
   tend = time(0); 
@@ -274,7 +182,7 @@ void algtr(int n,int r,int j,int parentnode,int* mark_iterator,vector<int>* mark
   
   if(j==r) // j=root node
   {
-    for (int i=*mark_iterator; i<n; i++)
+    for (int i=*mark_iterator; i<n-1; i++)  //(n-1=items)
     {
       if((*mark_node).at(i)==0)
       {
@@ -371,7 +279,11 @@ void algtr(int n,int r,int j,int parentnode,int* mark_iterator,vector<int>* mark
 }
 
 
-int sol(int j,vector<vector<double> >* Y,int P,double c)
+int sol(int j,                         // root node j=0
+        vector<vector<double> >* Y,    // 
+        int P,                         // P ^= 1-norm of objective vector 
+        double c                       // right hand side of the linear constraint
+        )
 {
   int OBJVAL=0;
   for(int i=0;i<P+1;i++)

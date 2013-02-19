@@ -4,33 +4,22 @@ using namespace std;
 using namespace NGraph;
 
 static
-SCIP_RETCODE lifting(SCIP* scip,             //SCIP data structure 
-		     int n,                  //number of variables
-		     int numbercons,         //number of constraints
-		     SCIP_VAR** vars,        //variables of scip
-                     SCIP_CONS** cons,       //constraints of scip
+SCIP_RETCODE lifting(
+		     int n_vars_cons_d,      //number of variables of constraint d
                      SCIP_Real* a,           //values of constraint d
                      SCIP_Real b,            //right hand side of constraint d
 		     Graph* Gr_conf,         //pointer to store conflict graph of conflict problem
 		     int* L,                 //set L=C without N(nue) with nue
+                     int* I,                 //set I=complement of L
 		     int size_L              //size of L
 		     )
 {
   ostringstream namebuf;
 
 
-  int k=1; //(lifting variable)
-
-
-    /////////////////////////////
-    // create lifting problem  //
-    /////////////////////////////
-
-    SCIP* lift = NULL;
-    SCIP_CALL( SCIPcreate(&lift) );
-    SCIP_CALL( SCIPincludeDefaultPlugins(lift) );
-    SCIP_CALL( SCIPcreateProbBasic(lift, "lift") );
-    SCIP_CALL(SCIPsetObjsense(lift, SCIP_OBJSENSE_MAXIMIZE));
+  int k=I[0];            //(lifting variable)
+  //k=1;
+    double a_k=a[k];  //coefficient of lifting variable
 
 
     /////////////////////////////////////////////////////////
@@ -54,12 +43,12 @@ SCIP_RETCODE lifting(SCIP* scip,             //SCIP data structure
     }
     nullvec.clear();
 
-    ///////////////////////////////////////////////////
-    // for all i\in L without N(k) create a variable //
-    ///////////////////////////////////////////////////
+    ///////////////////////////////
+    // create set L without N(k) //
+    ///////////////////////////////
 
-    vector<int> L_wo_N_k; // L without N(k)
-    int size_L_wo_N_k;    // size of L without N(k)
+    vector<int> L_wo_N_k;   // L without N(k)
+    int size_L_wo_N_k;      // size of L without N(k)
 
     int vars_it=0;  //vars iterator
     it=0;           //neigbor of k iterator
@@ -80,37 +69,17 @@ SCIP_RETCODE lifting(SCIP* scip,             //SCIP data structure
       {
         if(L[i]!=N_k_copy.at(it))
 	{
-          SCIP_VAR * var;
-          namebuf.str("");
-          namebuf << "x_lift#" << vars_it;
-
-          // create the SCIP_VAR object
-          SCIP_CALL( SCIPcreateVarBasic(lift, &var, namebuf.str().c_str(), 0.0, 1.0, a[L[i]], SCIP_VARTYPE_CONTINUOUS) );
-
           //add L[i] to L without N(k)
           L_wo_N_k.push_back(L[i]);
-
-          // add the SCIP_VAR object to the scip problem
-          SCIP_CALL( SCIPaddVar(lift, var) );
-          vars_it+=1;
 	}
       }
       else
       {
         if(L[i]<N_k_copy.at(it))
 	{
-          SCIP_VAR * var;
-          namebuf.str("");
-          namebuf << "x_lift#" << vars_it;
-
-          // create the SCIP_VAR object
-          SCIP_CALL( SCIPcreateVarBasic(lift, &var, namebuf.str().c_str(), 0.0, 1.0, a[L[i]], SCIP_VARTYPE_CONTINUOUS) );
-
           //add L[i] to L without N(k)
           L_wo_N_k.push_back(L[i]);
 
-          // add the SCIP_VAR object to the scip problem
-          SCIP_CALL( SCIPaddVar(lift, var) );
           vars_it+=1;
         }
       }
@@ -118,39 +87,90 @@ SCIP_RETCODE lifting(SCIP* scip,             //SCIP data structure
  
     size_L_wo_N_k=vars_it;  // size of L without N(k)
           
-    //get variables
-    SCIP_VAR** vars_lift=SCIPgetVars(lift); //vars_lift = variables of the lifting problem
     
 
-    /////////////////////////////////
-    //create the linear constraint //
-    /////////////////////////////////
+    ///////////////////////////////////////////////////
+    //create vector of weights and vector of profits //
+    ///////////////////////////////////////////////////
 
-    SCIP_CONS * cons_lift;
-    namebuf.str("");
-    namebuf<<"row_"<<1;
+    vector<double> w;     // vector of weights
+    vector<int> p;        // vector of profits
 
-    // create SCIP_CONS object
-    SCIP_CALL( SCIPcreateConsBasicLinear(lift, &cons_lift, namebuf.str().c_str(), 0, NULL, NULL, -SCIPinfinity(lift), b) );
-          
-    // add the vars to the constraint
     for (int j = 0; j < size_L_wo_N_k; ++j)
     {
-      SCIP_CALL( SCIPaddCoefLinear(lift, cons_lift, vars_lift[j],a[L_wo_N_k.at(j)]) );
+      p.push_back(a[L_wo_N_k.at(j)]);
+      w.push_back(a[L_wo_N_k.at(j)]);
     }
 
-    /////////////////////////////////
-    // create the SOS1 constraints //
-    /////////////////////////////////
+    
+    //////////////////////////////////////////////////////
+    // create the conflict Graph of the lifting problem //
+    //////////////////////////////////////////////////////
 
     Graph::vertex_set S;
     for (int j = 0; j < size_L_wo_N_k; ++j)
     {
-      S.insert(L_wo_N_k.at(j));
+      Graph::vertex vert=L_wo_N_k.at(j);
+      S.insert(vert);
     }
     
     Graph sub_Gr=(*Gr_conf).subgraph(S);
     
+
+    int *ind_in_d;
+    ind_in_d = new int[n_vars_cons_d];
+    it=0;
+    for (int j = 0; j < n_vars_cons_d; ++j)
+    {
+      if(j==L_wo_N_k[it])
+      {
+        ind_in_d[j]=it;
+        if(it<size_L_wo_N_k-1)
+	{
+          it+=1;
+	}
+      }
+      else
+      {
+        ind_in_d[j]=-1;
+      }
+    }
+
+
+    Graph compGraph;
+    for (int i = 0;  i< size_L_wo_N_k; ++i)
+    {
+      int node=L_wo_N_k.at(i);
+      if(sub_Gr.degree(node)!=0)
+      {
+        Graph::vertex_set Sout = sub_Gr.out_neighbors(node);
+        for (Graph::vertex_set::const_iterator t = Sout.begin(); t !=Sout.end(); t++)
+        {
+          cout << endl << node << "   xxx   " << *t;
+          compGraph.insert_edge(i,ind_in_d[*t]);
+        }
+      }
+    }
+
+
+
+    double OBJVAL_knap;
+    int items=size_L_wo_N_k;
+    double *x_knap;
+    x_knap = new double[items];
+    vector<double> lhs_values;
+    vector<double> obj_values;
+
+
+    SCIP_CALL(complementarity_knapsack(&compGraph,&w,&p,x_knap,&OBJVAL_knap,&lhs_values,&obj_values,b,a_k,items));
+
+
+
+    delete [] x_knap;
+    delete [] ind_in_d;
+    lhs_values.clear ();
+    obj_values.clear ();
+
 
   return SCIP_OKAY;
 }

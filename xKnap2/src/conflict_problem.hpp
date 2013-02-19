@@ -6,12 +6,6 @@ using namespace std;
 using namespace NGraph;
 
 
-struct SCIP_VarData
-{
-  int index;
-};
-
-
 static
 SCIP_RETCODE conflict_problem(SCIP* scip,             //SCIP data structure 
 			      int n,                  //number of variables
@@ -33,6 +27,7 @@ SCIP_RETCODE conflict_problem(SCIP* scip,             //SCIP data structure
 			      )
 {
   ostringstream namebuf;
+
 
   //////////////////////////////
   // create conflict problem  //
@@ -78,9 +73,10 @@ SCIP_RETCODE conflict_problem(SCIP* scip,             //SCIP data structure
 	  cons_it+=1;
         }
         vars_it+=1;
+
 	break;
       }
-    vars_it+=1;
+      vars_it+=1;
     }
     // add the SCIP_VAR object to the scip problem
     SCIP_CALL( SCIPaddVar(conf, var_conf) );
@@ -88,7 +84,6 @@ SCIP_RETCODE conflict_problem(SCIP* scip,             //SCIP data structure
     // storing for later access
     vars_conf[i] = var_conf;
   }
- 
 
   ////////////////////////////////////////////////////////////////////////////////
   // create the SOS1 constraints and the conflict graph of the conflict problem //
@@ -127,8 +122,8 @@ SCIP_RETCODE conflict_problem(SCIP* scip,             //SCIP data structure
         // create SCIP_CONS object
         SCIP_CALL( SCIPcreateConsBasicSOS1( conf, &sos1, namebuf.str().c_str(), 0, NULL, NULL ) ); 
         // add variables to the SOS1 constraint
-        SCIP_CALL( SCIPappendVarSOS1(conf, sos1, vars_conf[node1]) );
-        SCIP_CALL( SCIPappendVarSOS1(conf, sos1, vars_conf[node2]) );
+	SCIP_CALL( SCIPaddVarSOS1(conf, sos1, vars_conf[node1],0.5) );
+        SCIP_CALL( SCIPaddVarSOS1(conf, sos1, vars_conf[node2],0.5) );
         // add the constraint to scip
         SCIP_CALL( SCIPaddCons(conf, sos1) );
         cons_it+=1;

@@ -14,47 +14,47 @@ void mergesort(vector<double>* a,vector<int>* merke,int p,int r) // a=Vector of 
 }
 void merge(vector<double>* a,vector<int>* merke,int p,int q,int r)
 {
-double c[10];
-double d[10];
-int i=p;
-int j=q+1;
-int k=p;
-while((i<=q)&&(j<=r))
-{
-  if((*a).at(i)<(*a).at(j))
+  double c[r+1];
+  double d[r+1];
+  int i=p;
+  int j=q+1;
+  int k=p;
+  while((i<=q)&&(j<=r))
   {
-    c[k]=(*a).at(i);
+    if((*a).at(i)<(*a).at(j))
+    {
+      c[k]=(*a).at(i);
+      d[k]=(*merke).at(i);
+      i=i+1;
+      k=k+1;
+    }
+    else
+    {
+      c[k]=(*a).at(j);
+      d[k]=(*merke).at(j);
+      j=j+1;
+      k=k+1;
+    }
+  }
+  while(i<=q)
+  {
+    c[k] =(*a).at(i);
     d[k]=(*merke).at(i);
     i=i+1;
     k=k+1;
   }
-  else
+  while(j<=r)
   {
     c[k]=(*a).at(j);
     d[k]=(*merke).at(j);
     j=j+1;
     k=k+1;
   }
-}
-while(i<=q)
-{
-  c[k] =(*a).at(i);
-  d[k]=(*merke).at(i);
-  i=i+1;
-  k=k+1;
-}
-while(j<=r)
-{
-  c[k]=(*a).at(j);
-  d[k]=(*merke).at(j);
-  j=j+1;
-  k=k+1;
-}
-int l=p;
-while(l<=r)
-{
-  (*a).at(l)=c[l];
-  (*merke).at(l)=d[l];
-  l=l+1;
-}
+  int l=p;
+  while(l<=r)
+  {
+    (*a).at(l)=c[l];
+    (*merke).at(l)=d[l];
+    l=l+1;
+  }
 }
