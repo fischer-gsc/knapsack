@@ -147,18 +147,32 @@ SCIP_RETCODE complementarity_knapsack(
   //for each upper right hand side of linear constraint compute objective value
   vector<int> Data_rhs;
 
+  int was=0;
   for(int i=0;i<=OBJVAL;i++)
   {
     double dw; //left hand side of linear constraint
     dw=Y.at(i).at(r);
-    if((dw<=c)&&(dw>=c-a_k))    // c-1*a_k <= lhs <=c- 0*a_k
+    if(dw<=c-a_k)   // we need only one lhs with c-1*a_k >= lhs
+    {
+      if(was==0)
+      {
+        (*lhs_values).push_back(dw);
+        (*obj_values).push_back(i);
+        was=1;
+      }
+      else if(i>(*obj_values).at(0))
+      {
+        (*lhs_values).at(0)=dw;
+        (*obj_values).at(0)=i;
+      }
+    }
+    else if((dw<=c)&&(dw>c-a_k))    // lhs <=c- 0*a_k
     {
       (*lhs_values).push_back(dw);
       (*obj_values).push_back(i);
     }
   }
   
-
   Z.clear ();
   Y.clear ();
   XZ.clear ();
@@ -196,16 +210,16 @@ void algtr(int n,int r,int j,int parentnode,int* mark_iterator,vector<int>* mark
     }
   }
   
+
   Graph::vertex_set S = (*compGraph).out_neighbors(j);
   for (Graph::vertex_set::const_iterator t = S.begin(); t !=S.end(); t++)
   {
     if(*t!=parentnode)
     {
       (*mark_node).at(*t)=1;
-      parentnode=j;
       if(j!=r)
       {
-        algtr(n,r,*t,parentnode,mark_iterator,mark_node,Z,Y,XZ,XY,p,w,P,compGraph);
+        algtr(n,r,*t,j,mark_iterator,mark_node,Z,Y,XZ,XY,p,w,P,compGraph);
       }
       vector<double> save_vector_1(P+1);
       vector<double> save_vector_2(P+1);

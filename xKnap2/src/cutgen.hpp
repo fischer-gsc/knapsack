@@ -293,29 +293,29 @@ SCIP_RETCODE cutgen(SCIP* scip)
               size_L-=1;
 	    }
 	  }
-          
-          int* L;
-          L = new int[size_L];
+         
+
+          vector<int> L;
           int L_it=0; //iterator
           for (int i=0; i<n_vars_cons_d; i++)
           {
             if(cover_longnull.at(i)==1)
 	    {
-              L[L_it]=i;
+              L.push_back(i); //L[L_it]=i;
               L_it+=1;
 	    }
 	  }
-          L[size_L-1]=nue_w; //remark: L sorted without regard to last entry
+          L.push_back(nue_w); //remark: L sorted without regard to last entry
           //sort L
           for (int i=0; i<size_L-1; i++)
           {
-            if(L[i]>nue_w)
+            if(L.at(i)>nue_w)
 	    {
               for (int j=size_L-2; j>=i; j--)
               {
-                L[j+1]=L[j];
+                L.at(j+1)=L.at(j);
 	      }
-              L[i]=nue_w;
+              L.at(i)=nue_w;
               break;
 	    }
 	  }
@@ -334,7 +334,7 @@ SCIP_RETCODE cutgen(SCIP* scip)
           L_it=0;     //L iterator 
           for (int i=0; i<n_vars_cons_d; i++)
           {
-            if(L[L_it]==i)
+            if(L.at(L_it)==i)
 	    {
               if(L_it<size_L-1)
 	      {
@@ -348,14 +348,15 @@ SCIP_RETCODE cutgen(SCIP* scip)
 	    }
 	  }
 
-          SCIP_CALL(lifting(n_vars_cons_d,a,b,&Gr_conf,L,I,size_L));
+          //lift inequality in 5.3.2
+          SCIP_CALL(lifting(n_vars_cons_d,a,b,&Gr_conf,&L,I,size_L,size_I));
 
 
 
 
 
 
-          delete [] L;      //delete set L=C without N(nue) with nue
+
           delete [] I;      //delete set I=complement of L
 	} //end if success==1 (nue detected)
       } //end check if a cover is at hand

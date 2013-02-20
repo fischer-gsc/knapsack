@@ -1,4 +1,4 @@
-
+#include <set>
 #define _INF std::numeric_limits<double>::infinity();
 
 using namespace std;
@@ -10,18 +10,29 @@ SCIP_RETCODE lifting(
                      SCIP_Real* a,           //values of constraint d
                      SCIP_Real b,            //right hand side of constraint d
 		     Graph* Gr_conf,         //pointer to store conflict graph of conflict problem
-		     int* L,                 //set L=C without N(nue) with nue
+		     vector<int>* L,         //set L=C without N(nue) with nue
                      int* I,                 //set I=complement of L
-		     int size_L              //size of L
+		     int size_L,             //size of L
+		     int size_I              //size of I
 		     )
 {
   ostringstream namebuf;
 
 
-  int k=I[0];            //(lifting variable)
-  //k=1;
-    double a_k=a[k];  //coefficient of lifting variable
+  //get copy of a
+  double alpha[n_vars_cons_d];
+  for (int j = 0; j < n_vars_cons_d; ++j)
+  {
+    alpha[j]=a[j];
+  }
 
+
+  //for every k \in I :  lift
+  for (int f = 0; f < size_I; ++f)
+  {
+    int k=I[f];        //k=lifting variable
+    double a_k=a[k];  //coefficient of lifting variable
+    
 
     /////////////////////////////////////////////////////////
     // get neigbors of k and sort them in increasing order //
@@ -29,20 +40,21 @@ SCIP_RETCODE lifting(
 
     int deg_k = (*Gr_conf).degree(k);                       //degree of node k
     Graph::vertex_set N_k= (*Gr_conf).out_neighbors(k);     //neighbors of node k
-    vector<double> N_k_copy(deg_k);                         //copy of N_k
+    vector<double> N_k_sort(deg_k);                         //copy of N_k
     vector<int> nullvec(deg_k,0);                           //no need for mergesort  
     int it=0;                                               //iterator
     for (Graph::vertex_set::const_iterator t = N_k.begin(); t !=N_k.end(); t++)
     {
-      N_k_copy.at(it)=*t;
+      N_k_sort.at(it)=*t;
       it+=1;
     }
 
     if(deg_k>1)
     {
-      mergesort(&N_k_copy,&nullvec,0,deg_k-1);  // sort N_k_copy
+      mergesort(&N_k_sort,&nullvec,0,deg_k-1);  // sort N_k_sort
     }
     nullvec.clear();
+
 
     ///////////////////////////////
     // create set L without N(k) //
@@ -53,9 +65,10 @@ SCIP_RETCODE lifting(
 
     int vars_it=0;  //vars iterator
     it=0;           //neigbor of k iterator
+
     for (int i = 0; i < size_L; ++i)
     {
-      while(L[i]>N_k_copy.at(it))
+      while((*L).at(i)>N_k_sort.at(it))
       {
         if(it<deg_k-1)
 	{
@@ -68,38 +81,37 @@ SCIP_RETCODE lifting(
       }
       if(it==deg_k-1)
       {
-        if(L[i]!=N_k_copy.at(it))
+        if((*L).at(i)!=N_k_sort.at(it))
 	{
           //add L[i] to L without N(k)
-          L_wo_N_k.push_back(L[i]);
+          L_wo_N_k.push_back((*L).at(i));
+          vars_it+=1;
 	}
       }
       else
       {
-        if(L[i]<N_k_copy.at(it))
+        if((*L).at(i)<N_k_sort.at(it))
 	{
           //add L[i] to L without N(k)
-          L_wo_N_k.push_back(L[i]);
-
+          L_wo_N_k.push_back((*L).at(i));
           vars_it+=1;
         }
       }
     }
  
     size_L_wo_N_k=vars_it;  // size of L without N(k)
-          
-    
 
-    ///////////////////////////////////////////////////
-    //create vector of weights and vector of profits //
-    ///////////////////////////////////////////////////
+
+    ////////////////////////////////////////////////////
+    // create vector of weights and vector of profits //
+    ////////////////////////////////////////////////////
 
     vector<double> w;     // vector of weights
     vector<int> p;        // vector of profits
 
     for (int j = 0; j < size_L_wo_N_k; ++j)
     {
-      p.push_back(a[L_wo_N_k.at(j)]);
+      p.push_back(alpha[L_wo_N_k.at(j)]);
       w.push_back(a[L_wo_N_k.at(j)]);
     }
 
@@ -123,9 +135,9 @@ SCIP_RETCODE lifting(
     
 
 
-    //we have to change indices of vertex nodes
+    //we have to change the indices of the nodes
     
-    //Example: {2,5,6} -> {0,1,2}
+    //Example: {2,5,6} --> {0,1,2}
     //define ind_ind_d with
     //ind_ind_d[2]=0
     //ind_ind_d[5]=1
@@ -162,11 +174,15 @@ SCIP_RETCODE lifting(
         Graph::vertex_set Sout = sub_Gr.out_neighbors(node);
         for (Graph::vertex_set::const_iterator t = Sout.begin(); t !=Sout.end(); t++)
         {
-          cout << endl << node << "   xxx   " << *t;
           compGraph.insert_edge(i,ind_in_d[*t]);
         }
       }
     }
+
+
+    /////////////////////////////
+    // get lifting coefficient //
+    /////////////////////////////
 
 
     double OBJVAL_knap;          //objective value of knapsack problem
@@ -177,45 +193,88 @@ SCIP_RETCODE lifting(
                                  //constraint for every rhs<=c 
     vector<double> obj_values;   //vector to store obj.-values for every rhs<=c
 
-
     //solve knapsack problem s.t. x \in {0,1}^n
     //in addition, get all solutions for smaller rhs
     SCIP_CALL(complementarity_knapsack(&compGraph,&w,&p,x_knap,&OBJVAL_knap,&lhs_values,&obj_values,b,a_k,items));
 
 
-
     int size_lhs_values= static_cast<int>(lhs_values.size ());  // size of vector lhs_values
     double y;                    // y=a_k * x[k]
     double f_y;                  // f(y)=b-z(y)     ( z(y)=sol of knapsack problem with rhs=b-a_k*y ) 
-    double alpha;                // alpha=lifting coefficient of x[k]
-    double alpha_save=_INF;
-    cout << endl << size_lhs_values;
+    double alpha_k;              // alpha_k=lifting coefficient of x[k]
+    double alpha_k_save=_INF;
+
     for(int j=0;j<size_lhs_values;j++)
     {
-      y=(b-lhs_values[j])/a_k;
+        cout << endl << "lhs_values " << lhs_values[j];
+        cout << endl << "obj_values " << obj_values[j];
+      y=(b-lhs_values[j])/a_k;  // remark: a_k>0 always fulfilled
       if(y>1)
       {
         y=1;
       }
-      f_y=b-obj_values[j];
-      cout << endl << y << endl <<"  "<< f_y;
-      alpha=f_y/y;              // y != 0 ??????
-      if(alpha<alpha_save)
+      if(y>0)
       {
-        alpha_save=alpha;
+        f_y=b-obj_values[j];
+        cout << endl << "y= " << y;
+	cout << endl << "f_y= " << f_y;
+        alpha_k=f_y/y;          // y != 0
+        if(alpha_k<alpha_k_save)
+        {
+          alpha_k_save=alpha_k;
+        }
       }
     }
-    alpha=alpha_save;
-
-    cout << endl << alpha;
+    alpha_k=alpha_k_save;
 
 
+    cout << endl << "L\N(k)= " <<endl;
+    for(int j=0;j<size_L_wo_N_k;j++)
+    {
+      cout << endl << L_wo_N_k.at(j);
+    }
+    cout << endl;
+
+    cout << endl << "k=  "<< k << "  " << "alpha_k=  " << alpha_k << endl;
+
+
+    /////////////////////////
+    // update L and size_L //
+    /////////////////////////
+
+    size_L+=1;
+    (*L).push_back(k); //remark: L sorted without regard to last entry
+    //sort L
+    for (int i=0; i<size_L-1; i++)
+    {
+      if((*L).at(i)>k)
+      {
+        for (int j=size_L-2; j>=i; j--)
+        {
+          (*L).at(j+1)=(*L).at(j);
+	}
+        (*L).at(i)=k;
+        break;
+      }
+    }
+
+
+    //////////////////
+    // update alpha //
+    //////////////////
+
+    alpha[k]=alpha_k;
+
+
+    ///////////////
+    //clear data //
+    ///////////////
 
     delete [] x_knap;
     delete [] ind_in_d;
     lhs_values.clear ();
     obj_values.clear ();
-
+}
 
   return SCIP_OKAY;
 }
