@@ -7,11 +7,14 @@ using namespace NGraph;
 static
 SCIP_RETCODE lifting(
 		     int n_vars_cons_d,      //number of variables of constraint d
+                     double* alpha,           //pointer to store values of lifted inequality
                      SCIP_Real* a,           //values of constraint d
                      SCIP_Real b,            //right hand side of constraint d
+                     int nue_w,              //nue in w_vars
+                     double alpha_nue,       //alpha_nue=b^(d)-\sum_{i \in C without N(nue)} a_i^(d)
 		     Graph* Gr_conf,         //pointer to store conflict graph of conflict problem
 		     vector<int>* L,         //set L=C without N(nue) with nue
-                     int* I,                 //set I=complement of L
+                     vector<int>* I,         //set I=complement of L
 		     int size_L,             //size of L
 		     int size_I              //size of I
 		     )
@@ -19,19 +22,28 @@ SCIP_RETCODE lifting(
   ostringstream namebuf;
 
 
-  //get copy of a
-  double alpha[n_vars_cons_d];
+  //create vector alpha (later update possible)
+  //alpha[i]=a[i]        if i != nue
+  //alpha[i]=alpha_nue   if i=nue
   for (int j = 0; j < n_vars_cons_d; ++j)
   {
-    alpha[j]=a[j];
+    if(j==nue_w)
+    {
+      alpha[j]=alpha_nue;
+    }
+    else
+    {
+      alpha[j]=a[j];
+    }
   }
 
 
   //for every k \in I :  lift
-  for (int f = 0; f < size_I; ++f)
+  for (int f = size_I-1; f>=0 ; --f)
   {
-    int k=I[f];        //k=lifting variable
-    double a_k=a[k];  //coefficient of lifting variable
+
+    int k=(*I).at(f);    //k=lifting variable
+    double a_k=a[k];     //coefficient of lifting variable
     
 
     /////////////////////////////////////////////////////////
@@ -66,41 +78,48 @@ SCIP_RETCODE lifting(
     int vars_it=0;  //vars iterator
     it=0;           //neigbor of k iterator
 
-    for (int i = 0; i < size_L; ++i)
+    if(deg_k>0)
     {
-      while((*L).at(i)>N_k_sort.at(it))
+      for (int i = 0; i < size_L; ++i)
       {
-        if(it<deg_k-1)
-	{
-          it+=1;
-	}
-        else
-	{
-	  break;
+        while((*L).at(i)>N_k_sort.at(it))
+        {
+          if(it<deg_k-1)
+    	  {
+            it+=1;
+	  }
+          else
+	  {
+	    break;
+          }
         }
-      }
-      if(it==deg_k-1)
-      {
-        if((*L).at(i)!=N_k_sort.at(it))
-	{
-          //add L[i] to L without N(k)
-          L_wo_N_k.push_back((*L).at(i));
-          vars_it+=1;
-	}
-      }
-      else
-      {
-        if((*L).at(i)<N_k_sort.at(it))
-	{
-          //add L[i] to L without N(k)
-          L_wo_N_k.push_back((*L).at(i));
-          vars_it+=1;
+        if(it==deg_k-1)
+        {
+          if((*L).at(i)!=N_k_sort.at(it))
+	  {
+            //add L[i] to L without N(k)
+            L_wo_N_k.push_back((*L).at(i));
+            vars_it+=1;
+  	  }
+        }
+        else
+        {
+          if((*L).at(i)<N_k_sort.at(it))
+	  {
+            //add L[i] to L without N(k)
+            L_wo_N_k.push_back((*L).at(i));
+            vars_it+=1;
+          }
         }
       }
     }
  
     size_L_wo_N_k=vars_it;  // size of L without N(k)
-
+    if(size_L_wo_N_k==0)
+    {
+      alpha[k]=b;
+      continue;
+    }
 
     ////////////////////////////////////////////////////
     // create vector of weights and vector of profits //
@@ -115,7 +134,7 @@ SCIP_RETCODE lifting(
       w.push_back(a[L_wo_N_k.at(j)]);
     }
 
-    
+
     //////////////////////////////////////////////////////
     // create the conflict Graph of the lifting problem //
     //////////////////////////////////////////////////////
@@ -148,8 +167,8 @@ SCIP_RETCODE lifting(
     ind_in_d = new int[n_vars_cons_d];
     it=0;
     for (int j = 0; j < n_vars_cons_d; ++j)
-    {
-      if(j==L_wo_N_k[it])
+    {    
+      if(j==L_wo_N_k.at(it))
       {
         ind_in_d[j]=it;
         if(it<size_L_wo_N_k-1)
@@ -164,7 +183,6 @@ SCIP_RETCODE lifting(
     }
 
     //create conflict graph with changed vertex indices 
-
     Graph compGraph;
     for (int i = 0;  i< size_L_wo_N_k; ++i)
     {
@@ -197,7 +215,6 @@ SCIP_RETCODE lifting(
     //in addition, get all solutions for smaller rhs
     SCIP_CALL(complementarity_knapsack(&compGraph,&w,&p,x_knap,&OBJVAL_knap,&lhs_values,&obj_values,b,a_k,items));
 
-
     int size_lhs_values= static_cast<int>(lhs_values.size ());  // size of vector lhs_values
     double y;                    // y=a_k * x[k]
     double f_y;                  // f(y)=b-z(y)     ( z(y)=sol of knapsack problem with rhs=b-a_k*y ) 
@@ -206,18 +223,10 @@ SCIP_RETCODE lifting(
 
     for(int j=0;j<size_lhs_values;j++)
     {
-        cout << endl << "lhs_values " << lhs_values[j];
-        cout << endl << "obj_values " << obj_values[j];
       y=(b-lhs_values[j])/a_k;  // remark: a_k>0 always fulfilled
-      if(y>1)
-      {
-        y=1;
-      }
       if(y>0)
       {
         f_y=b-obj_values[j];
-        cout << endl << "y= " << y;
-	cout << endl << "f_y= " << f_y;
         alpha_k=f_y/y;          // y != 0
         if(alpha_k<alpha_k_save)
         {
@@ -226,9 +235,13 @@ SCIP_RETCODE lifting(
       }
     }
     alpha_k=alpha_k_save;
+    if(alpha_k<0) // alpha_k<0 is a result of numerical instabilities
+    {
+      alpha_k=0;
+    }
 
-
-    cout << endl << "L\N(k)= " <<endl;
+    /*
+    cout << endl << endl << "L\N(k)= ";
     for(int j=0;j<size_L_wo_N_k;j++)
     {
       cout << endl << L_wo_N_k.at(j);
@@ -236,7 +249,7 @@ SCIP_RETCODE lifting(
     cout << endl;
 
     cout << endl << "k=  "<< k << "  " << "alpha_k=  " << alpha_k << endl;
-
+    */
 
     /////////////////////////
     // update L and size_L //

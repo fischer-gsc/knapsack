@@ -54,6 +54,10 @@ SCIP_RETCODE complementarity_knapsack(
   {
     W+=(*w).at(i);
   }
+  if(c>W)
+  {
+    W=c;
+  }
 
   //define root node
   int r=items;

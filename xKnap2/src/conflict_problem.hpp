@@ -38,6 +38,7 @@ SCIP_RETCODE conflict_problem(SCIP* scip,             //SCIP data structure
   SCIP_CALL( SCIPincludeDefaultPlugins(conf) );
   SCIP_CALL( SCIPcreateProbBasic(conf, "conf") );
   SCIP_CALL(SCIPsetObjsense(conf, SCIP_OBJSENSE_MAXIMIZE));
+  SCIP_CALL(SCIPsetMessagehdlr(conf,NULL)); //suppress messages
 
   //////////////////////////////////////////////////
   // create the variables of the conflict problem //
@@ -154,7 +155,7 @@ SCIP_RETCODE conflict_problem(SCIP* scip,             //SCIP data structure
   /////////////////////////////
   //  free conflict problem  //
   /////////////////////////////
-
+  /*
   SCIP_CONS** cons_conf=SCIPgetConss(conf);
   int numbercons_conf=SCIPgetNConss(conf); //number of constraints
   for (int i=0; i<numbercons_conf; i++)
@@ -165,6 +166,7 @@ SCIP_RETCODE conflict_problem(SCIP* scip,             //SCIP data structure
   {
     SCIP_CALL( SCIPreleaseVar(conf,&vars_conf[i] ) );
   }
+  */
   SCIP_CALL(SCIPfree(&conf) );
 
   return SCIP_OKAY;

@@ -6,7 +6,8 @@ SCIP_RETCODE LP_relax(SCIP* scip,             //SCIP data structure
 		      int numbercons,         //numbercons = number of constraints
                       int n,                  //n=number of variables
                       SCIP_VARDATA* vardata,  //vector with indices of variables of obj
-		      double* x_star          //pointer to store solution of LP rel.
+		      double* x_star,         //pointer to store solution of LP rel.
+                      SCIP_Real* objval_LP    //pointer to store objective value
 		      )
 {
 
@@ -17,6 +18,7 @@ SCIP_RETCODE LP_relax(SCIP* scip,             //SCIP data structure
   SCIP_CALL( SCIPincludeDefaultPlugins(LP) );
   SCIP_CALL( SCIPcreateProbBasic(LP, "LP") );
   SCIP_CALL(SCIPsetObjsense(LP, SCIP_OBJSENSE_MAXIMIZE));
+  SCIP_CALL(SCIPsetMessagehdlr(LP,NULL)); //suppress messages
 
   SCIP_VAR* vars_LP[n]; //vector to store variables of LP rel.
 
@@ -89,7 +91,7 @@ SCIP_RETCODE LP_relax(SCIP* scip,             //SCIP data structure
   //get solution
   SCIP_CALL( SCIPsolve(LP) );
   SCIP_SOL* sol_LP = SCIPgetBestSol(LP);
-  //SCIP_Real objval_LP= SCIPgetSolOrigObj(LP,sol_LP);
+  *objval_LP= SCIPgetSolOrigObj(LP,sol_LP);
   
   for (int i=0; i<n; i++)
   {
