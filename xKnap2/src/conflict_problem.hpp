@@ -152,6 +152,7 @@ SCIP_RETCODE conflict_problem(SCIP* scip,             //SCIP data structure
   }
 
 
+
   /////////////////////////////
   //  free conflict problem  //
   /////////////////////////////

@@ -97,6 +97,7 @@ SCIP_RETCODE cutgen(SCIP* scip)
     SCIP_CALL(LP_relax(scip,cons,vars,numbercons,n,&vardata[n],x_star,&objval_LP));
     ZFW.push_back(objval_LP);
 
+
     /////////////////////////////////////
     // 4.     create conflict graph   //
     /////////////////////////////////////
@@ -122,9 +123,9 @@ SCIP_RETCODE cutgen(SCIP* scip)
       }
     }
 
-    /////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////
     // 5.  for every linear constraint d: try to generate a cut  //
-    /////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////
 
     for (int d=0; d<numbercons; d++)
     {
@@ -135,7 +136,6 @@ SCIP_RETCODE cutgen(SCIP* scip)
 	// 5.1    get data of constraint d  //
 	//////////////////////////////////////
 
-	const char* name_cons_d=SCIPconsGetName(cons[d]);        //name of constraint d
 	SCIP_VAR** vars_cons_d=SCIPgetVarsLinear(scip,cons[d]);  //vars of constraint d
 	// xxx varslin
 	SCIP_Real b= SCIPgetRhsLinear(scip,cons[d]);             //rhs of constraint d
@@ -190,7 +190,7 @@ SCIP_RETCODE cutgen(SCIP* scip)
 	  // 5.3.1    compute cover    //
 	  ///////////////////////////////
 
-	  int size_cover=null_norm_w; // size of cover
+	  int size_cover=null_norm_w;  // size of cover
 	  int cover_xvars[size_cover]; // cover (in indices of x_vars)
 	  int cover_wvars[size_cover]; // cover (in indices of w_vars)
 	  int cover_it=0; //iterator
@@ -218,7 +218,7 @@ SCIP_RETCODE cutgen(SCIP* scip)
 	  double sum_C=OBJVAL_conf;                        // sum_C := \sum_{i \in C } a_i^(d)   (C=cover_wvars)
 	  double sum_L;                                    // sum_L := \sum_{i \in C without N(nue)} a_i^(d) + a_nue^(d)
 
-	  int n_wnull=0;                                     // number of w[i] with w[i]==0 and x_star[posvars_cons_d[i]]!=0
+	  int n_wnull=0;                                   // number of w[i] with w[i]==0 and x_star[posvars_cons_d[i]]!=0
 	  vector<double> a_wnull;                          // set {a_i^{d} : w[i]==0 and x_star[posvars_cons_d[i]]!=0}
 	  vector<double> a_wnull_sort;                     // a_wnull sorted (minimum value - first position)
 	  vector<int> pos_w_a_wnull;                       // vector to store position of a_i^{d} with w[i]==0 and 
@@ -228,7 +228,7 @@ SCIP_RETCODE cutgen(SCIP* scip)
 
 	  for (int i=0; i<n_vars_cons_d; i++)
 	  {
-	    if((w[i]<0.5)&&(x_star[posvars_cons_d[i]]>-tol))       //(w[i]<0.5 ^= w[i]==0)
+	    if((w[i]<0.5)&&(x_star[posvars_cons_d[i]]>tol))       //(w[i]<0.5 ^= w[i]==0)
 	    {
 	      a_wnull.push_back(a[i]);
 	      a_wnull_sort.push_back(a[i]);
@@ -243,7 +243,10 @@ SCIP_RETCODE cutgen(SCIP* scip)
 	  {
 	    mergesort(&a_wnull_sort,&pos_w_a_wnull_sort,0,n_wnull-1);  // sort a_wnull
 	  }
-
+	  else if(n_wnull==0)
+	  {
+            continue;  //continue 5. : for every linear constraint d: try to generate a cut 
+	  }
 
 
 	  //////////////////////////////
@@ -279,10 +282,11 @@ SCIP_RETCODE cutgen(SCIP* scip)
 	    }     
 	  }
 
+
 	  if(success==1)
 	  {
 	    //////////////////////////////////////////////////////////////////////////
-	    // 5.3.2.3   determine L and size of L ( L=C without N(nue) with nue )  //
+	    // 5.3.2.3   determine L and size of L ( L=C with nue )  //
 	    //////////////////////////////////////////////////////////////////////////
 
 	    int size_L=size_cover+1; //size of cover + index nue
@@ -296,7 +300,7 @@ SCIP_RETCODE cutgen(SCIP* scip)
 	    /*
 	    for (Graph::vertex_set::const_iterator t = N_nue.begin(); t !=N_nue.end(); t++)
 	    {
-	      if(w[*t]>0.5)  // (w[*t]==1)
+	      if(w[*t]>0.5)  // (w[*t]>0.5 -> w[*t]==1 -> *t \in C)
 	      {
 		cover_longnull.at(*t)=0;;
 		size_L-=1;
@@ -328,7 +332,6 @@ SCIP_RETCODE cutgen(SCIP* scip)
 		break;
 	      }
 	    }
-
 
 	    //////////////////////
 	    // 5.3.3   lifting  //
@@ -374,7 +377,6 @@ SCIP_RETCODE cutgen(SCIP* scip)
 	    //define pointer to store values of lifted inequality
 	    double *alpha;
 	    alpha = new double[n_vars_cons_d];
-
 
 	    //lift inequality in 5.3.2
 	    SCIP_CALL(lifting(n_vars_cons_d,alpha,a,b,nue_w,alpha_nue,&Gr_conf,&L,&I,size_L,size_I));
@@ -427,10 +429,10 @@ SCIP_RETCODE cutgen(SCIP* scip)
 
 
 
-  for (int i=0; i<n; i++)
-  {
-    cout << endl << x_star[i];
-  }
+    // for (int i=0; i<n; i++)
+    //{
+    //   cout << endl << x_star[i];
+    //}
 
   }
 

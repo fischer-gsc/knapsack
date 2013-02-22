@@ -1,5 +1,5 @@
-#include <set>
 #define _INF std::numeric_limits<double>::infinity();
+#define delta 0.0001; //tolerance
 
 using namespace std;
 using namespace NGraph;
@@ -20,9 +20,10 @@ SCIP_RETCODE lifting(
 		     )
 {
   ostringstream namebuf;
+  double tol=delta; 
 
 
-  //create vector alpha (later update possible)
+  //create vector alpha (later: update)
   //alpha[i]=a[i]        if i != nue
   //alpha[i]=alpha_nue   if i=nue
   for (int j = 0; j < n_vars_cons_d; ++j)
@@ -37,7 +38,6 @@ SCIP_RETCODE lifting(
     }
   }
 
-
   //for every k \in I :  lift
   for (int f = size_I-1; f>=0 ; --f)
   {
@@ -47,7 +47,7 @@ SCIP_RETCODE lifting(
     
 
     /////////////////////////////////////////////////////////
-    // get neigbors of k and sort them in increasing order //
+    // get neighbors of k and sort them in increasing order //
     /////////////////////////////////////////////////////////
 
     int deg_k = (*Gr_conf).degree(k);                       //degree of node k
@@ -115,12 +115,31 @@ SCIP_RETCODE lifting(
     }
  
     size_L_wo_N_k=vars_it;  // size of L without N(k)
+
+    
     if(size_L_wo_N_k==0)
     {
+      //update alpha
       alpha[k]=b;
+      // update L and size_L
+      size_L+=1;
+      (*L).push_back(k); //remark: L sorted without regard to last entry
+      //sort L
+      for (int i=0; i<size_L-1; i++)
+      {
+        if((*L).at(i)>k)
+        {
+          for (int j=size_L-2; j>=i; j--)
+          {
+            (*L).at(j+1)=(*L).at(j);
+  	  }
+          (*L).at(i)=k;
+          break;
+        }
+      }
       continue;
     }
-
+   
     ////////////////////////////////////////////////////
     // create vector of weights and vector of profits //
     ////////////////////////////////////////////////////
@@ -133,7 +152,7 @@ SCIP_RETCODE lifting(
       p.push_back(alpha[L_wo_N_k.at(j)]);
       w.push_back(a[L_wo_N_k.at(j)]);
     }
-
+   
 
     //////////////////////////////////////////////////////
     // create the conflict Graph of the lifting problem //
@@ -221,20 +240,27 @@ SCIP_RETCODE lifting(
     double alpha_k;              // alpha_k=lifting coefficient of x[k]
     double alpha_k_save=_INF;
 
+
     for(int j=0;j<size_lhs_values;j++)
     {
       y=(b-lhs_values[j])/a_k;  // remark: a_k>0 always fulfilled
-      if(y>0)
+      f_y=b-obj_values[j];
+      if(y>tol)
       {
-        f_y=b-obj_values[j];
         alpha_k=f_y/y;          // y != 0
         if(alpha_k<alpha_k_save)
         {
           alpha_k_save=alpha_k;
         }
       }
+      else if((y<tol)&&(f_y<tol))
+      {
+        alpha_k_save=0;
+        break;
+      }
     }
     alpha_k=alpha_k_save;
+
     if(alpha_k<0) // alpha_k<0 is a result of numerical instabilities
     {
       alpha_k=0;
@@ -287,7 +313,7 @@ SCIP_RETCODE lifting(
     delete [] ind_in_d;
     lhs_values.clear ();
     obj_values.clear ();
-}
+  }
 
   return SCIP_OKAY;
 }
